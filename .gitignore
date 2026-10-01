@@ -1,5 +1,6 @@
 node_modules
 .next
+.next-e2e
 .env*
 !.env.example
 public/sw.js
@@ -10,3 +11,4 @@ next-env.d.ts
 .DS_Store
 test-results
 playwright-report
+.vercel

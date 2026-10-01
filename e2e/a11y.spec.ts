@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openDump, setNow, toUnderstand, EXAMPLE } from "./helpers";
 
 async function axe(page: Page, label: string) {

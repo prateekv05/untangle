@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { openDump, setNow, toPlan, toUnderstand, EXAMPLE } from "./helpers";
 
 test("keyboard-only walkthrough from dump to re-planned", async ({ page }) => {

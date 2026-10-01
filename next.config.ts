@@ -7,6 +7,7 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === "development",
 });
 
-const nextConfig: NextConfig = {};
+// e2e runs its own dev server beside yours: a separate build folder keeps the two from clashing.
+const nextConfig: NextConfig = { distDir: process.env.NEXT_DIST_DIR || ".next" };
 
 export default withSerwist(nextConfig);

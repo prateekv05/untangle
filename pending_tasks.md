@@ -6,7 +6,7 @@ Last updated: 2026-10-01. Tick `[x]` when done. Build progress per phase is trac
 
 - [ ] Kickoff prompt (read docs, summarise, list risks and doc gaps)
 - [x] Phase 0 scaffold and guardrails
-- [ ] Phase 1 static UI with fixtures
+- [x] Phase 1 static UI with fixtures
 - [ ] Phase 2 data layer on Neon
 - [ ] Phase 3 sign-up gate (Google, required), onboarding, optional password, account routes
 - [ ] Phase 4 understand

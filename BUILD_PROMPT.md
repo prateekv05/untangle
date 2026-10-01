@@ -50,7 +50,7 @@ Phase 0. Scaffold the project. Plan first, then build.
 [x] Acceptance: `npm run typecheck && npm run lint && npm run test && npm run build` pass. /dev/tokens renders correctly in light and dark at 390 px. No raw hex values outside design/tokens.css.
 ```
 
-## [ ] Phase 1: static UI with fixture data
+## [x] Phase 1: static UI with fixture data
 
 ```
 Phase 1. Build every screen in docs/SCREENS.md with FIXTURE data only. No database, no AI, no network.

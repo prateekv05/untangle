@@ -17,6 +17,14 @@ export class NotFoundError extends Error {
   }
 }
 
+/** Bad input that got past the route's schema (for example a move target that is not later). Becomes a 400. */
+export class InputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InputError";
+  }
+}
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isIsoDate(value: string): boolean {
@@ -26,13 +34,13 @@ export function isIsoDate(value: string): boolean {
 }
 
 export function assertIsoDate(value: string): void {
-  if (!isIsoDate(value)) throw new Error(`Expected YYYY-MM-DD, got "${value}"`);
+  if (!isIsoDate(value)) throw new InputError(`Expected YYYY-MM-DD, got "${value}"`);
 }
 
 /** A task can only be moved to a later day than the one it is on. ISO dates compare as strings. */
 export function assertMoveTarget(fromDate: string, toDate: string): void {
   assertIsoDate(toDate);
-  if (toDate <= fromDate) throw new Error("A task can only be moved to a later day");
+  if (toDate <= fromDate) throw new InputError("A task can only be moved to a later day");
 }
 
 /** Database row to the domain Task used by the planner and the UI. */

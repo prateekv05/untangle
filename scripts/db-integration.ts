@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { makeDb } from "../src/db/client";
 import { AiLimitError, carryOver, createDayWithTasks, getDay, getSettings, getUserById, incrementAiUsage, moveTaskToLater, NotFoundError, savePlan, updateTask } from "../src/db/queries";
 import { clearAuthAttempts, clearPassword, completeOnboarding, findUserByEmail, findUserByGoogleSub, recordAuthAttempt, setPassword, upsertGoogleUser } from "../src/db/queries/account";
+import { deletePreset, listPresets, MAX_PRESETS, PresetLimitError, savePreset, saveSettings } from "../src/db/queries/presets";
 import { users } from "../src/db/schema";
 import { authenticatePassword } from "../src/lib/credentials";
 import { hashPassword } from "../src/lib/password";
@@ -29,6 +30,7 @@ try {
   ids.push(a.id, b.id);
   assert.equal((await getUserById(a.id, db))?.email, a.email);
 
+  assert.deepEqual(await getSettings("00000000-0000-4000-8000-000000000000", db), DEFAULT_SETTINGS); // unknown user: defaults, no throw
   const s = await getSettings(a.id, db);
   assert.deepEqual(s, DEFAULT_SETTINGS);
   await getSettings(a.id, db); // idempotent
@@ -131,6 +133,28 @@ try {
     await clearAuthAttempts(`ip:${ip}`, db);
     await clearAuthAttempts(`email:nobody-${tag}@test.invalid`, db);
   }
+
+  // settings and presets: per user, one preset per phrase in any case, capped, delete only your own
+  const mine = { verb: "Swim", location: "outside", kind: "health", defaultDurationMin: 45 } as const;
+  const saved = await savePreset(u3.id, mine, db);
+  const again = await savePreset(u3.id, { ...mine, verb: "swim", defaultDurationMin: null }, db);
+  const list3 = await listPresets(u3.id, db);
+  assert.equal(list3.length, 1);
+  assert.deepEqual([list3[0].verb, list3[0].defaultDurationMin], ["swim", null]);
+  assert.notEqual(saved.id, again.id);
+  assert.deepEqual(await listPresets(a.id, db), []);
+  await expectNotFound(deletePreset(a.id, again.id, db)); // someone else's
+  await deletePreset(u3.id, again.id, db);
+  await expectNotFound(deletePreset(u3.id, again.id, db));
+  for (let i = 0; i < MAX_PRESETS; i++) await savePreset(u3.id, { ...mine, verb: `p${i}` }, db);
+  await assert.rejects(savePreset(u3.id, { ...mine, verb: "one too many" }, db), PresetLimitError);
+  await savePreset(u3.id, { ...mine, verb: "P0", defaultDurationMin: 10 }, db); // replacing at the cap is allowed
+  assert.equal((await listPresets(u3.id, db)).length, MAX_PRESETS);
+
+  const next = { ...DEFAULT_SETTINGS, workStart: "08:30", workDays: [1, 3], timezone: "Europe/London" };
+  assert.deepEqual(await saveSettings(u3.id, next, db), next);
+  assert.deepEqual(await getSettings(u3.id, db), next);
+  assert.deepEqual(await getSettings(a.id, db), DEFAULT_SETTINGS);
 
   console.log("db integration: all passed");
 } finally {

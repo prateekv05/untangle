@@ -17,9 +17,10 @@ export async function getUserById(userId: string, db: Db = getDb()) {
 }
 
 export async function getSettings(userId: string, db: Db = getDb()): Promise<Settings> {
-  await db.insert(settings).values({ userId }).onConflictDoNothing();
+  // Selects from users so an account deleted mid-request inserts nothing instead of failing the foreign key.
+  await db.execute(sql`insert into settings (user_id) select id from users where id = ${userId} on conflict do nothing`);
   const [row] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
-  if (!row) return { ...DEFAULT_SETTINGS }; // user does not exist (insert hit the FK)
+  if (!row) return { ...DEFAULT_SETTINGS }; // the user does not exist
   return { workStart: row.workStart, workEnd: row.workEnd, workDays: row.workDays, wake: row.wake, sleep: row.sleep, timezone: row.timezone };
 }
 

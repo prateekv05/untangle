@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import { browserTimezone } from "@/lib/clock";
 import type { Settings } from "@/lib/schemas";
 import { themePreference, setThemePreference, type ThemePref } from "@/lib/theme";
+import { AccountSection } from "../account-section";
 import { Button } from "../button";
 import { SegmentedControl } from "../segmented-control";
 import { Sheet } from "../sheet";
@@ -19,7 +20,7 @@ const zones = (current: string): string[] => {
 };
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export function SettingsSheet({ settings, presetCount, onSave, onPresets, onClose }: { settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onClose: () => void }) {
+export function SettingsSheet({ settings, presetCount, onSave, onPresets, onPassword, onClose }: { settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onPassword: (hasPassword: boolean) => void; onClose: () => void }) {
   const [s, setS] = useState(settings);
   const [pref, setPref] = useState<ThemePref>(() => themePreference());
   const id = useId();
@@ -34,6 +35,7 @@ export function SettingsSheet({ settings, presetCount, onSave, onPresets, onClos
   const toggleDay = (d: number) => setS({ ...s, workDays: s.workDays.includes(d) ? s.workDays.filter((x) => x !== d) : [...s.workDays, d].sort() });
   return (
     <Sheet title="Settings" onClose={onClose} tall>
+      <AccountSection onPassword={onPassword} />
       <form onSubmit={(e) => { e.preventDefault(); onSave(s); }}>
         <div className="mb-4 flex gap-3">{time("workStart", "Work starts")}{time("workEnd", "Work ends")}</div>
         <p id={`${id}-days`} className={label}>Working days</p>

@@ -16,7 +16,8 @@ export type SheetState =
   | { type: "move"; taskId: string }
   | { type: "replan" }
   | { type: "settings" }
-  | { type: "presets" };
+  | { type: "presets" }
+  | { type: "password" };
 
 export interface Moved { taskId: string; to: string }
 export interface Replan {

@@ -1,7 +1,7 @@
 "use server";
 
 import { AuthError } from "next-auth";
-import { signIn } from "@/lib/auth";
+import { signIn, signOut } from "@/lib/auth";
 
 export async function signInWithGoogle() {
   await signIn("google", { redirectTo: "/" });
@@ -20,4 +20,9 @@ export async function signInWithPassword(_prev: PasswordState, form: FormData): 
     throw e;
   }
   return { failed: false, ok: true, email };
+}
+
+/** Clears the session cookie. The client then navigates to Welcome with a full page load. */
+export async function signOutAction() {
+  await signOut({ redirect: false });
 }

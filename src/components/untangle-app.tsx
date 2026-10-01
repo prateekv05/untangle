@@ -16,6 +16,7 @@ import { ThinkingScreen, thinkingSteps } from "./screens/thinking-screen";
 import { UnderstandScreen } from "./screens/understand-screen";
 import { EditSheet } from "./sheets/edit-sheet";
 import { MoveSheet } from "./sheets/move-sheet";
+import { PasswordSheet } from "./sheets/password-sheet";
 import { PresetsSheet } from "./sheets/presets-sheet";
 import { ReplanSheet } from "./sheets/replan-sheet";
 import { SettingsSheet } from "./sheets/settings-sheet";
@@ -42,6 +43,7 @@ export function UntangleApp() {
   const [micOnOpen, setMicOnOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [taken, setTaken] = useState<string[]>([]);
+  const [hasPassword, setHasPassword] = useState(false);
   // Carry-over needs a backend (Phase 6); in Phase 1 it only shows with ?carry=1 so the card can be seen.
   const carried = new URLSearchParams(search).get("carry") === "1" ? ["Gym", "Buy toothpaste"].filter((c) => !taken.includes(c)) : [];
 
@@ -147,8 +149,9 @@ export function UntangleApp() {
         />
       )}
       {s.sheet?.type === "settings" && (
-        <SettingsSheet settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onSave={(settings) => { dispatch({ type: "settings", settings }); closeSheet(); }} />
+        <SettingsSheet settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={(settings) => { dispatch({ type: "settings", settings }); closeSheet(); }} />
       )}
+      {s.sheet?.type === "password" && <PasswordSheet hasPassword={hasPassword} onClose={() => dispatch({ type: "sheet", sheet: { type: "settings" } })} onDone={(text) => { dispatch({ type: "sheet", sheet: { type: "settings" } }); dispatch({ type: "toast", text }); }} />}
       {s.sheet?.type === "presets" && <PresetsSheet presets={s.presets} onChange={(presets) => dispatch({ type: "presets", presets })} onClose={closeSheet} />}
       {s.toast && <Toast {...s.toast} onUndo={() => dispatch({ type: "undo" })} onDone={() => dispatch({ type: "toast", text: null })} />}
     </div>

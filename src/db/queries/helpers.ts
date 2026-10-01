@@ -57,3 +57,14 @@ export type TaskPatch = Partial<Pick<Task, "title" | "location" | "kind" | "dura
 export function cleanPatch<T extends object>(patch: T): Partial<T> {
   return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
 }
+
+export const GENDERS = ["woman", "man", "non_binary", "prefer_not_to_say"] as const;
+export type Gender = (typeof GENDERS)[number];
+
+/** Emails are compared case-insensitively; store and look up the lowercase form. */
+export const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+
+/** Start of the fixed rate-limit window that contains `now`. */
+export function windowStart(now: Date, windowMs: number): Date {
+  return new Date(Math.floor(now.getTime() / windowMs) * windowMs);
+}

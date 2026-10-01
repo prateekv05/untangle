@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import { makeDb } from "../src/db/client";
 import { AiLimitError, carryOver, createDayWithTasks, getDay, getSettings, getUserById, incrementAiUsage, moveTaskToLater, NotFoundError, savePlan, updateTask } from "../src/db/queries";
+import { clearAuthAttempts, clearPassword, completeOnboarding, findUserByEmail, findUserByGoogleSub, recordAuthAttempt, setPassword, upsertGoogleUser } from "../src/db/queries/account";
 import { users } from "../src/db/schema";
 import { planDay } from "../src/lib/planner";
 import { DEFAULT_SETTINGS, type Plan } from "../src/lib/schemas";
@@ -62,6 +63,41 @@ try {
   for (let i = 1; i <= 40; i++) assert.equal(await incrementAiUsage(a.id, "2026-10-01", 40, db), i);
   await assert.rejects(incrementAiUsage(a.id, "2026-10-01", 40, db), AiLimitError);
   assert.equal(await incrementAiUsage(a.id, "2026-10-02", 40, db), 1);
+
+  // accounts: first sign-in creates, later sign-in returns the same row and keeps an edited name
+  const sub = `sub-g-${tag}`;
+  const g1 = await upsertGoogleUser({ sub, email: `G-${tag}@Test.invalid`, name: "Sam Google" }, db);
+  ids.push(g1.id);
+  assert.equal(g1.email, `g-${tag}@test.invalid`);
+  assert.equal(g1.onboardedAt, null);
+  assert.deepEqual(await getSettings(g1.id, db), DEFAULT_SETTINGS);
+  const done = await completeOnboarding(g1.id, { name: "Sam", gender: null }, db);
+  assert.ok(done.onboardedAt);
+  const g2 = await upsertGoogleUser({ sub, email: g1.email, name: "Other Name" }, db);
+  assert.equal(g2.id, g1.id);
+  assert.equal(g2.name, "Sam");
+  assert.equal(g2.onboardedAt?.getTime(), done.onboardedAt?.getTime());
+  assert.equal((await findUserByGoogleSub(sub, db))?.id, g1.id);
+  assert.equal((await findUserByEmail(g1.email.toUpperCase(), db))?.id, g1.id);
+
+  // password set / clear
+  await setPassword(g1.id, "salt:hash", db);
+  assert.equal((await getUserById(g1.id, db))?.passwordHash, "salt:hash");
+  await clearPassword(g1.id, db);
+  assert.equal((await getUserById(g1.id, db))?.passwordHash, null);
+
+  // rate limit: the 6th attempt in a window is blocked, a new window is allowed, clearing resets
+  const key = `email:${tag}`;
+  const now = new Date("2026-10-01T10:00:00Z");
+  try {
+    for (let i = 1; i <= 5; i++) assert.deepEqual(await recordAuthAttempt(key, { limit: 5, windowMs: 900_000, now }, db), { allowed: true, count: i });
+    assert.equal((await recordAuthAttempt(key, { limit: 5, windowMs: 900_000, now }, db)).allowed, false);
+    assert.equal((await recordAuthAttempt(key, { limit: 5, windowMs: 900_000, now: new Date("2026-10-01T10:15:00Z") }, db)).allowed, true);
+    await clearAuthAttempts(key, db);
+    assert.equal((await recordAuthAttempt(key, { limit: 5, windowMs: 900_000, now }, db)).count, 1);
+  } finally {
+    await clearAuthAttempts(key, db);
+  }
 
   console.log("db integration: all passed");
 } finally {

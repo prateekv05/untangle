@@ -1,0 +1,51 @@
+"use client";
+
+import { useId, useState } from "react";
+import { cn } from "@/lib/cn";
+import type { Settings } from "@/lib/schemas";
+import { themePreference, setThemePreference, type ThemePref } from "@/lib/theme";
+import { Button } from "../button";
+import { SegmentedControl } from "../segmented-control";
+import { Sheet } from "../sheet";
+
+const DAYS = [["Mo", 1], ["Tu", 2], ["We", 3], ["Th", 4], ["Fr", 5], ["Sa", 6], ["Su", 0]] as const;
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+export function SettingsSheet({ settings, presetCount, onSave, onPresets, onClose }: { settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onClose: () => void }) {
+  const [s, setS] = useState(settings);
+  const [pref, setPref] = useState<ThemePref>(() => themePreference());
+  const id = useId();
+  const field = "min-h-11 w-full rounded-md border border-line bg-surface-soft px-3.5 text-base";
+  const label = "mb-1.5 block text-[13px] font-medium leading-[18px] text-ink-muted";
+  const time = (key: "workStart" | "workEnd" | "wake" | "sleep", text: string) => (
+    <div className="flex-1">
+      <label htmlFor={`${id}-${key}`} className={label}>{text}</label>
+      <input id={`${id}-${key}`} type="time" value={s[key]} onChange={(e) => e.target.value && setS({ ...s, [key]: e.target.value })} className={field} />
+    </div>
+  );
+  const toggleDay = (d: number) => setS({ ...s, workDays: s.workDays.includes(d) ? s.workDays.filter((x) => x !== d) : [...s.workDays, d].sort() });
+  return (
+    <Sheet title="Settings" onClose={onClose} tall>
+      <form onSubmit={(e) => { e.preventDefault(); onSave(s); }}>
+        <div className="mb-4 flex gap-3">{time("workStart", "Work starts")}{time("workEnd", "Work ends")}</div>
+        <p id={`${id}-days`} className={label}>Working days</p>
+        <div role="group" aria-labelledby={`${id}-days`} className="mb-4 flex gap-1.5">
+          {DAYS.map(([name, d]) => {
+            const on = s.workDays.includes(d);
+            return (
+              <button key={d} type="button" aria-pressed={on} aria-label={DAY_NAMES[d]} onClick={() => toggleDay(d)} className={cn("min-h-11 flex-1 rounded-sm border text-sm font-semibold", on ? "border-ink bg-ink text-ink-inverse" : "border-line bg-surface text-ink")}>{name}</button>
+            );
+          })}
+        </div>
+        <div className="mb-4 flex gap-3">{time("wake", "Awake from")}{time("sleep", "Awake until")}</div>
+        <button type="button" onClick={onPresets} className="mb-4 flex min-h-[52px] w-full items-center justify-between rounded-md bg-surface-soft px-4 text-left font-semibold">
+          Presets <span className="font-medium text-ink-muted">{presetCount === 0 ? "None yet" : presetCount === 1 ? "1 yours" : `${presetCount} yours`}</span>
+        </button>
+        <p className={label}>Appearance</p>
+        <SegmentedControl<ThemePref> label="Appearance" value={pref} onChange={(v) => { setPref(v); setThemePreference(v); }} options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "System" }]} />
+        <p className="voice-sm m-0 mt-4 text-ink-muted">Your voice is turned into text and then discarded.</p>
+        <div className="mt-5"><Button type="submit">Save</Button></div>
+      </form>
+    </Sheet>
+  );
+}

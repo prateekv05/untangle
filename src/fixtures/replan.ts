@@ -69,9 +69,9 @@ export function interpretReplan(text: string, openTasks: Task[], nowMin: number)
 }
 
 /** Chip sentences. Chips that need a target are completed with the picked task or amount. */
-export const REPLAN_CHIPS = [
-  { id: "unfinished", label: "I didn't finish something", needs: "task" as const, sentence: (x: string) => `I didn't finish ${x}.` },
-  { id: "late", label: "Running late", needs: "delay" as const, sentence: (x: string) => `I'm running ${x} late.` },
+export const REPLAN_CHIPS: { id: string; label: string; needs: "task" | "delay" | null; sentence: (x: string) => string }[] = [
+  { id: "unfinished", label: "I didn't finish something", needs: "task", sentence: (x: string) => `I didn't finish ${x}.` },
+  { id: "late", label: "Running late", needs: "delay", sentence: (x: string) => `I'm running ${x} late.` },
   { id: "light", label: "Lighter afternoon", needs: null, sentence: () => "Make it a lighter afternoon." },
   { id: "three", label: "Only 3 hours left", needs: null, sentence: () => "I only have 3 hours left." },
   { id: "must", label: "I must finish the app today", needs: null, sentence: () => "I must finish the app today." },

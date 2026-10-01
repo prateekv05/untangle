@@ -66,14 +66,14 @@ Phase 1. Build every screen in docs/SCREENS.md with FIXTURE data only. No databa
 [ ] Acceptance: side by side at 390 px with design/screens/*.html the visuals match (spacing, type, colour, radii). Keyboard-only walkthrough works. axe finds no serious issues on any screen. `typecheck`, `lint`, `test` pass. Show me screenshots of each screen in light and dark.
 ```
 
-## [ ] Phase 2: data layer on Neon
+## [x] Phase 2: data layer on Neon
 
 ```
 Phase 2. Persistence layer. No auth yet (Phase 3), no AI yet.
 
-1. [ ] Drizzle client for Neon (src/db/client.ts, neon-http). Generate and apply the initial migration from src/db/schema.ts. The schema already includes the account columns (users.google_sub, email, name, gender, password_hash, onboarded_at) and plans.model. Do not change the schema without telling me why.
-2. [ ] Queries in src/db/queries/ as listed in docs/DATA_MODEL.md (getUserById, getSettings, createDayWithTasks, getDay, savePlan, updateTask, moveTaskToLater, carryOver, incrementAiUsage). Every query takes userId explicitly and filters by it; no query reads a cookie or session. Settings default rows are created by the account-creation query in Phase 3, but getSettings must also insert defaults if missing.
-3. [ ] Unit tests for the queries' pure helpers; an integration test script that inserts a user directly, then a day, tasks and a plan against a Neon branch DB (use env TEST_DATABASE_URL) and cleans up.
+1. [x] Drizzle client for Neon (src/db/client.ts, neon-http). Generate and apply the initial migration from src/db/schema.ts. The schema already includes the account columns (users.google_sub, email, name, gender, password_hash, onboarded_at) and plans.model. Do not change the schema without telling me why.
+2. [x] Queries in src/db/queries/ as listed in docs/DATA_MODEL.md (getUserById, getSettings, createDayWithTasks, getDay, savePlan, updateTask, moveTaskToLater, carryOver, incrementAiUsage). Every query takes userId explicitly and filters by it; no query reads a cookie or session. Settings default rows are created by the account-creation query in Phase 3, but getSettings must also insert defaults if missing.
+3. [x] Unit tests for the queries' pure helpers; an integration test script that inserts a user directly, then a day, tasks and a plan against a Neon branch DB (use env TEST_DATABASE_URL) and cleans up.
 
 [ ] Acceptance: the migration applies cleanly to an empty Neon branch; the integration test passes; incrementAiUsage rejects the 41st call; a test proves one user cannot read another user's day or tasks; typecheck, lint, test pass.
 ```

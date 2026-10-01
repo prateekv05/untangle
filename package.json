@@ -12,7 +12,8 @@
     "test": "tsx --test \"src/**/*.test.ts\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "eval": "tsx scripts/eval.ts"
+    "eval": "tsx scripts/eval.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.71",
@@ -27,6 +28,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@serwist/next": "^9.5.12",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.6.3",

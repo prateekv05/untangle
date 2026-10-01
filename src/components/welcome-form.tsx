@@ -13,6 +13,8 @@ export function WelcomeForm({ googleFailed }: { googleFailed: boolean }) {
   const [state, action, pending] = useActionState(signInWithPassword, { failed: false, ok: false, email: "" });
 
   useEffect(() => {
+    // Full navigation on purpose: the proxy must see the new session and route to onboarding or Dump.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     if (state.ok) window.location.assign("/");
   }, [state.ok]);
 

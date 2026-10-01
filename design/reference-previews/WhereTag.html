@@ -1,0 +1,47 @@
+<!doctype html><html><head><style>/* design/tokens.css, inlined so this file works on its own */
+:root,[data-theme="light"]{--ground:#f2f3f7;--surface:#ffffff;--surface-soft:#ecedf4;--line:#dcdde8;--ink:#17142b;--ink-muted:#5e5d75;--ink-inverse:#ffffff;--thread-outside:#0f9d6c;--outside-ink:#0b6f4e;--outside-tint:#ddf4ea;--thread-work:#3b5bfd;--work-ink:#2b45d1;--work-tint:#e3e8ff;--thread-home:#c98300;--home-ink:#8a5b00;--home-tint:#fff0cc;--thread-anywhere:#6b6a80;--anywhere-ink:#55546a;--anywhere-tint:#ecebf3;--ask:#d6336c;--ask-ink:#a3205e;--ask-tint:#fce4ee;--danger:#b3261e;--focus:var(--thread-work);--shadow-lift:0 12px 32px rgba(23,20,43,0.14);}
+[data-theme="dark"]{--ground:#0e0c1d;--surface:#181530;--surface-soft:#221e3e;--line:#2e2a4d;--ink:#f1f0fa;--ink-muted:#a9a8c3;--ink-inverse:#17142b;--thread-outside:#3dd9a0;--outside-ink:#7debc0;--outside-tint:#0f2e25;--thread-work:#8fa3ff;--work-ink:#b9c5ff;--work-tint:#1a2150;--thread-home:#ffc043;--home-ink:#ffd580;--home-tint:#33260a;--thread-anywhere:#9c9bb5;--anywhere-ink:#c8c7dc;--anywhere-tint:#262340;--ask:#ff7fb0;--ask-ink:#ffa6c8;--ask-tint:#3a1428;--danger:#ff8c85;--focus:var(--thread-work);--shadow-lift:0 12px 32px rgba(0,0,0,0.5);}
+:root{--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-10:40px;--radius-sm:10px;--radius-md:16px;--radius-lg:24px;--radius-pill:999px;--font-sans:"Schibsted Grotesk", system-ui, sans-serif;--font-serif:"Newsreader", Georgia, serif;}
+</style><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0}
+body{background:var(--ground);color:var(--ink);font-family:var(--font-sans);font-size:16px;line-height:24px;padding:20px;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.voice{font-family:var(--font-serif);font-size:18px;line-height:25px}
+.btn{background:var(--ink);color:var(--ink-inverse);border-radius:var(--radius-md);padding:12px 20px;font-weight:600;min-height:48px}
+.btn[disabled]{opacity:.35;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.link{color:var(--ink-muted);text-decoration:underline;text-underline-offset:3px;font-size:14px;line-height:20px;font-weight:500;min-height:44px;padding:0 8px}
+.tag{display:inline-flex;align-items:center;gap:6px;border-radius:var(--radius-pill);padding:3px 10px 3px 8px;font-size:13px;line-height:18px;font-weight:600}
+.tag::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--c)}
+.tag.outside{--c:var(--thread-outside);background:var(--outside-tint);color:var(--outside-ink)}
+.tag.work{--c:var(--thread-work);background:var(--work-tint);color:var(--work-ink)}
+.tag.home{--c:var(--thread-home);background:var(--home-tint);color:var(--home-ink)}
+.tag.anywhere{--c:var(--thread-anywhere);background:var(--anywhere-tint);color:var(--anywhere-ink)}
+.pill{font-size:13px;line-height:18px;font-weight:600;color:var(--ink-muted);background:var(--surface-soft);border-radius:var(--radius-pill);padding:4px 10px}
+.tsel{border:1px solid var(--line);background:var(--surface-soft);color:var(--ink);border-radius:var(--radius-pill);padding:5px 12px;font-size:13px;line-height:18px;font-weight:600}
+.tsel.auto{border-style:dashed;background:transparent;color:var(--ink-muted)}
+.tsel.ask{border-color:var(--ask);background:var(--ask-tint);color:var(--ask-ink)}
+.row{display:grid;grid-template-columns:48px 24px 1fr;column-gap:8px;position:relative}
+.time{font-weight:600;font-size:15px;line-height:18px;padding-top:17px;color:var(--ink-muted);font-variant-numeric:tabular-nums}
+.spine{position:relative}
+.spine::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--line)}
+.row.trip .spine::before{width:5px;margin-left:-2.5px;background:var(--thread-outside);border-radius:3px}
+.node{position:absolute;left:50%;top:22px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--c);box-shadow:0 0 0 3px var(--ground)}
+.node.outside{--c:var(--thread-outside)}.node.work{--c:var(--thread-work)}.node.home{--c:var(--thread-home)}.node.anywhere{--c:var(--thread-anywhere)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:12px;width:100%;text-align:left}
+.name{font-weight:600}
+.meta{display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--ink-muted);font-size:13px;line-height:18px;font-weight:500;flex-wrap:wrap}
+.why{margin-top:10px;background:var(--surface-soft);border-radius:var(--radius-sm);padding:9px 12px}
+.check{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center;color:transparent}
+.done .check{background:var(--thread-outside);border-color:var(--thread-outside);color:#fff}
+.done .name{text-decoration:line-through;color:var(--ink-muted)}
+.acts{display:flex;gap:8px;margin-top:12px}
+.act{flex:1;min-height:44px;border-radius:var(--radius-sm);background:var(--surface-soft);font-weight:600;font-size:14px}
+.act.fin{background:var(--outside-tint);color:var(--outside-ink)}
+.top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+</style></head><body>
+<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="tag outside">Outside</span><span class="tag work">Work</span><span class="tag home">Home</span><span class="tag anywhere">Anywhere</span></div>
+<p class="voice" style="margin:18px 0 8px;color:var(--ink-muted)">Time chips</p>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="tsel auto">Auto (~15 min)</span><span class="tsel ask">How long? (~60 min)</span><span class="tsel">90 min</span></div>
+<p class="voice" style="margin:18px 0 8px;color:var(--ink-muted)">Fact pills</p>
+<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill">Fixed at 17:00</span><span class="pill">Due tomorrow</span><span class="pill">Fixed time</span></div></body></html>

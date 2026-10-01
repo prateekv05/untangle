@@ -1,7 +1,6 @@
 /** Password hashing with scrypt from node:crypto. Stored as "salt:hash", both hex. No extra dependency. */
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 
-export const MIN_PASSWORD_LENGTH = 10;
 const KEY_LEN = 64;
 const SALT_LEN = 16;
 

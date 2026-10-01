@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useReducer, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState, useSyncExternalStore } from "react";
+import { deletePreset, getPresets, getSettings, postPreset, putSettings } from "@/lib/api-client";
 import { APPOINTMENT_DUMP, EXAMPLE_DUMP, fixtureTasksFor } from "@/fixtures/example";
 import { interpretReplan } from "@/fixtures/replan";
 import { browserTimezone, nowMinutes } from "@/lib/clock";
 import { initialState, reducer } from "@/lib/flow";
 import { countThings, deriveQuestions, tasksFromText } from "@/lib/guess";
+import type { Preset } from "@/lib/guess";
 import type { Task } from "@/lib/schemas";
 import { toHHMM } from "@/lib/time";
 import type { Where } from "@/lib/where";
@@ -30,10 +32,10 @@ const EXAMPLES = [
 ];
 
 /**
- * Phase 1: every screen as one client state machine (src/lib/flow.ts) over fixture data.
- * No database, no AI, no network. A day is created from a dump and lives for that day.
+ * Every screen as one client state machine (src/lib/flow.ts). Understanding and planning still run on fixtures
+ * until the AI phases; settings and presets are the signed-in account's own and are saved through /api.
  */
-export function UntangleApp() {
+export function UntangleApp({ name = null }: { name?: string | null }) {
   const [s, dispatch] = useReducer(reducer, undefined, () => {
     const init = initialState();
     return { ...init, settings: { ...init.settings, timezone: browserTimezone() } };
@@ -44,8 +46,58 @@ export function UntangleApp() {
   const [notice, setNotice] = useState<string | null>(null);
   const [taken, setTaken] = useState<string[]>([]);
   const [hasPassword, setHasPassword] = useState(false);
+  // Settings open only once the account's own values are in, so an early tap cannot save defaults over them.
+  const [account, setAccount] = useState<"loading" | "ready" | "failed">("loading");
   // Carry-over needs a backend (Phase 6); in Phase 1 it only shows with ?carry=1 so the card can be seen.
   const carried = new URLSearchParams(search).get("carry") === "1" ? ["Gym", "Buy toothpaste"].filter((c) => !taken.includes(c)) : [];
+
+  // Settings and presets belong to the account: load them once, then save changes optimistically and roll back on failure.
+  useEffect(() => {
+    let live = true;
+    Promise.all([getSettings(), getPresets()])
+      .then(([settings, presets]) => {
+        if (!live) return;
+        // A brand-new account has the default "UTC"; adopt this device's zone until the user chooses one.
+        dispatch({ type: "settings", settings: settings.timezone === "UTC" ? { ...settings, timezone: browserTimezone() } : settings });
+        dispatch({ type: "presets", presets });
+        setAccount("ready");
+      })
+      .catch(() => {
+        if (!live) return;
+        setAccount("failed"); // still lets Settings open, so signing out works
+        dispatch({ type: "toast", text: "I couldn't load your settings. Check your connection." });
+      });
+    return () => { live = false; };
+  }, []);
+  const saveSettings = (settings: typeof s.settings) => {
+    const before = s.settings;
+    dispatch({ type: "settings", settings });
+    closeSheet();
+    putSettings(settings).catch(() => {
+      dispatch({ type: "settings", settings: before });
+      dispatch({ type: "toast", text: "I couldn't save your settings. They are back as they were." });
+    });
+  };
+  const addPreset = (p: Omit<Preset, "id">) => {
+    const temp: Preset = { ...p, id: `tmp-${Date.now()}` };
+    dispatch({ type: "presetAdd", preset: temp });
+    postPreset(p)
+      .then((preset) => dispatch({ type: "presetSaved", tempId: temp.id, preset }))
+      .catch(() => {
+        dispatch({ type: "presetDrop", id: temp.id });
+        dispatch({ type: "toast", text: "I couldn't save that preset." });
+      });
+  };
+  const removePreset = (id: string) => {
+    const removed = s.presets.find((x) => x.id === id);
+    if (!removed) return;
+    dispatch({ type: "presetDrop", id });
+    if (id.startsWith("tmp-")) return; // never reached the server
+    deletePreset(id).catch(() => {
+      dispatch({ type: "presetRestore", preset: removed });
+      dispatch({ type: "toast", text: "I couldn't delete that preset." });
+    });
+  };
 
   const now = useCallback(() => nowMinutes(window.location.search), []);
   const today = useMemo(() => new Date(), []);
@@ -120,7 +172,7 @@ export function UntangleApp() {
         onMic={() => dispatch({ type: "screen", screen: "listening" })}
         onSubmit={submitDump} onSettings={openSettings}
         onYours={() => dispatch({ type: "sheet", sheet: { type: "presets" } })}
-        presets={s.presets} notice={notice}
+        presets={s.presets} notice={notice} name={name}
         carried={carried} onCarry={(title) => { dispatch({ type: "text", text: `${s.text.trim() ? `${s.text.trim()}\n` : ""}${title}` }); setTaken((t) => [...t, title]); }}
         examples={demo ? EXAMPLES : undefined} onExample={(text) => dispatch({ type: "text", text })}
       />
@@ -148,11 +200,11 @@ export function UntangleApp() {
           }}
         />
       )}
-      {s.sheet?.type === "settings" && (
-        <SettingsSheet settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={(settings) => { dispatch({ type: "settings", settings }); closeSheet(); }} />
+      {s.sheet?.type === "settings" && account !== "loading" && (
+        <SettingsSheet settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={saveSettings} />
       )}
       {s.sheet?.type === "password" && <PasswordSheet hasPassword={hasPassword} onClose={() => dispatch({ type: "sheet", sheet: { type: "settings" } })} onDone={(text) => { dispatch({ type: "sheet", sheet: { type: "settings" } }); dispatch({ type: "toast", text }); }} />}
-      {s.sheet?.type === "presets" && <PresetsSheet presets={s.presets} onChange={(presets) => dispatch({ type: "presets", presets })} onClose={closeSheet} />}
+      {s.sheet?.type === "presets" && <PresetsSheet presets={s.presets} onAdd={addPreset} onRemove={removePreset} onClose={closeSheet} />}
       {s.toast && <Toast {...s.toast} onUndo={() => dispatch({ type: "undo" })} onDone={() => dispatch({ type: "toast", text: null })} />}
     </div>
   );

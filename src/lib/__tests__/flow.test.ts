@@ -134,3 +134,18 @@ test("browserTimezone returns an IANA zone name", () => {
   const tz = browserTimezone();
   assert.ok(tz === "UTC" || tz.includes("/"), tz);
 });
+
+test("optimistic preset edits: add replaces the same phrase, swap keeps order, drop and restore round-trip", () => {
+  const swim = { id: "tmp-1", phrase: "Swim", location: "outside" as const, kind: "health" as const, durationMin: 45 };
+  let s = reducer(initialState(), { type: "presetAdd", preset: swim });
+  s = reducer(s, { type: "presetAdd", preset: { ...swim, id: "tmp-2", phrase: "swim", durationMin: null } });
+  assert.deepEqual(s.presets.map((p) => p.id), ["tmp-2"]); // same phrase in any case is one preset
+  s = reducer(s, { type: "presetSaved", tempId: "tmp-2", preset: { ...swim, id: "real-2", phrase: "swim", durationMin: null } });
+  assert.deepEqual(s.presets.map((p) => p.id), ["real-2"]);
+  const gone = s.presets[0];
+  s = reducer(s, { type: "presetDrop", id: "real-2" });
+  assert.deepEqual(s.presets, []);
+  s = reducer(s, { type: "presetRestore", preset: gone });
+  s = reducer(s, { type: "presetRestore", preset: gone }); // restoring twice does not duplicate
+  assert.deepEqual(s.presets.map((p) => p.id), ["real-2"]);
+});

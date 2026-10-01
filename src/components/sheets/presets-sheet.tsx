@@ -13,7 +13,7 @@ import { WhereTag } from "../where-tag";
 
 const TIMES = [10, 15, 20, 30, 45, 60, 90, 120];
 
-export function PresetsSheet({ presets, onChange, onClose }: { presets: Preset[]; onChange: (p: Preset[]) => void; onClose: () => void }) {
+export function PresetsSheet({ presets, onAdd, onRemove, onClose }: { presets: Preset[]; onAdd: (p: Omit<Preset, "id">) => void; onRemove: (id: string) => void; onClose: () => void }) {
   const [phrase, setPhrase] = useState("");
   const [where, setWhere] = useState<Where>("anywhere");
   const [kind, setKind] = useState<Task["kind"]>("admin");
@@ -23,7 +23,7 @@ export function PresetsSheet({ presets, onChange, onClose }: { presets: Preset[]
   const add = () => {
     const p = phrase.trim();
     if (!p) return;
-    onChange([{ id: `u-${Date.now()}`, phrase: p, location: where, kind, durationMin: time === "ask" ? null : time }, ...presets.filter((x) => x.phrase.toLowerCase() !== p.toLowerCase())]);
+    onAdd({ phrase: p, location: where, kind, durationMin: time === "ask" ? null : time });
     setPhrase("");
   };
   const row = (p: Preset, mine: boolean) => (
@@ -32,7 +32,7 @@ export function PresetsSheet({ presets, onChange, onClose }: { presets: Preset[]
       <WhereTag where={p.location} />
       <span className="text-[13px] font-medium text-ink-muted">{KIND_LABEL[p.kind]}, {p.durationMin === null ? "ask me" : fmtDuration(p.durationMin)}</span>
       {mine && (
-        <button type="button" aria-label={`Delete ${p.phrase}`} onClick={() => onChange(presets.filter((x) => x.id !== p.id))} className="grid size-11 place-items-center border-0 bg-transparent text-ink-muted"><Icon name="trash" size={18} /></button>
+        <button type="button" aria-label={`Delete ${p.phrase}`} onClick={() => onRemove(p.id)} className="grid size-11 place-items-center border-0 bg-transparent text-ink-muted"><Icon name="trash" size={18} /></button>
       )}
     </li>
   );

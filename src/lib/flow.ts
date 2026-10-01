@@ -100,6 +100,11 @@ export type Action =
   | { type: "toast"; text: string | null; undo?: boolean; ms?: number }
   | { type: "settings"; settings: Settings }
   | { type: "presets"; presets: Preset[] }
+  /** Optimistic preset edits: add (replacing the same phrase), swap the temporary id for the saved one, drop, put back. */
+  | { type: "presetAdd"; preset: Preset }
+  | { type: "presetSaved"; tempId: string; preset: Preset }
+  | { type: "presetDrop"; id: string }
+  | { type: "presetRestore"; preset: Preset }
   | { type: "reset" };
 
 const SNAP = (s: FlowState): Snapshot => ({ plan: s.plan, tasks: s.tasks, moved: s.moved, done: s.done, replan: s.replan });
@@ -220,6 +225,14 @@ export function reducer(s: FlowState, a: Action): FlowState {
       return { ...s, settings: a.settings };
     case "presets":
       return { ...s, presets: a.presets };
+    case "presetAdd":
+      return { ...s, presets: [a.preset, ...s.presets.filter((x) => x.phrase.toLowerCase() !== a.preset.phrase.toLowerCase())] };
+    case "presetSaved":
+      return { ...s, presets: s.presets.map((x) => (x.id === a.tempId ? a.preset : x)) };
+    case "presetDrop":
+      return { ...s, presets: s.presets.filter((x) => x.id !== a.id) };
+    case "presetRestore":
+      return s.presets.some((x) => x.id === a.preset.id) ? s : { ...s, presets: [a.preset, ...s.presets] };
     case "reset":
       return { ...initialState(), settings: s.settings, presets: s.presets };
   }

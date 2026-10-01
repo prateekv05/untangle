@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { cn } from "@/lib/cn";
+import { browserTimezone } from "@/lib/clock";
 import type { Settings } from "@/lib/schemas";
 import { themePreference, setThemePreference, type ThemePref } from "@/lib/theme";
 import { Button } from "../button";
@@ -9,6 +10,13 @@ import { SegmentedControl } from "../segmented-control";
 import { Sheet } from "../sheet";
 
 const DAYS = [["Mo", 1], ["Tu", 2], ["We", 3], ["Th", 4], ["Fr", 5], ["Sa", 6], ["Su", 0]] as const;
+const auto = browserTimezone();
+/** Automatic (the browser's zone) first, then every IANA zone, plus the current value if the list lacks it. */
+const zones = (current: string): string[] => {
+  let all: string[] = [];
+  try { all = Intl.supportedValuesOf("timeZone"); } catch { /* older browsers: keep the short list */ }
+  return [...new Set([auto, current, ...all])];
+};
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function SettingsSheet({ settings, presetCount, onSave, onPresets, onClose }: { settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onClose: () => void }) {
@@ -38,6 +46,10 @@ export function SettingsSheet({ settings, presetCount, onSave, onPresets, onClos
           })}
         </div>
         <div className="mb-4 flex gap-3">{time("wake", "Awake from")}{time("sleep", "Awake until")}</div>
+        <label htmlFor={`${id}-tz`} className={label}>Timezone</label>
+        <select id={`${id}-tz`} value={s.timezone} onChange={(e) => setS({ ...s, timezone: e.target.value })} className={`${field} mb-4`}>
+          {zones(s.timezone).map((z) => <option key={z} value={z}>{z === auto ? `Automatic, ${z}` : z}</option>)}
+        </select>
         <button type="button" onClick={onPresets} className="mb-4 flex min-h-[52px] w-full items-center justify-between rounded-md bg-surface-soft px-4 text-left font-semibold">
           Presets <span className="font-medium text-ink-muted">{presetCount === 0 ? "None yet" : presetCount === 1 ? "1 yours" : `${presetCount} yours`}</span>
         </button>

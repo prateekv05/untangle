@@ -17,3 +17,12 @@ export function nowMinutes(search?: string, date: Date = new Date()): number {
 
 /** Round up to the next 5 minutes so a rebuilt day never starts in the past. */
 export const roundUp5 = (n: number): number => Math.ceil(n / 5) * 5;
+
+/** The user's IANA timezone from the browser, e.g. "Europe/London". Falls back to UTC if unavailable. */
+export function browserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}

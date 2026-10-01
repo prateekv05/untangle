@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useReducer, useState, useSyncExternalStore } from "react";
 import { APPOINTMENT_DUMP, EXAMPLE_DUMP, fixtureTasksFor } from "@/fixtures/example";
 import { interpretReplan } from "@/fixtures/replan";
-import { nowMinutes } from "@/lib/clock";
+import { browserTimezone, nowMinutes } from "@/lib/clock";
 import { initialState, reducer } from "@/lib/flow";
 import { countThings, deriveQuestions, tasksFromText } from "@/lib/guess";
 import type { Task } from "@/lib/schemas";
@@ -33,7 +33,10 @@ const EXAMPLES = [
  * No database, no AI, no network. A day is created from a dump and lives for that day.
  */
 export function UntangleApp() {
-  const [s, dispatch] = useReducer(reducer, undefined, () => initialState());
+  const [s, dispatch] = useReducer(reducer, undefined, () => {
+    const init = initialState();
+    return { ...init, settings: { ...init.settings, timezone: browserTimezone() } };
+  });
   const search = useSyncExternalStore(noopSubscribe, () => window.location.search, () => "");
   const demo = new URLSearchParams(search).get("demo") === "1";
   const [micOnOpen, setMicOnOpen] = useState(false);

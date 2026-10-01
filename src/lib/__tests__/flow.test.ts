@@ -5,7 +5,7 @@ import { validatePlan } from "../validate-plan";
 import { countThings, deriveQuestions, guessTask, parseTime, splitDump, tasksFromText } from "../guess";
 import { appointmentTasks, EXAMPLE_DUMP, exampleTasks, fixtureTasksFor } from "../../fixtures/example";
 import { interpretReplan } from "../../fixtures/replan";
-import { nowMinutes } from "../clock";
+import { browserTimezone, nowMinutes } from "../clock";
 import { DEFAULT_SETTINGS } from "../schemas";
 import { toMin } from "../time";
 
@@ -128,4 +128,9 @@ test("clock: ?now pins the time, real time is clamped to the daytime window", ()
   assert.equal(nowMinutes("?now=11:45"), toMin("11:45"));
   assert.equal(nowMinutes("", new Date(2026, 9, 1, 3, 0)), toMin("08:30"));
   assert.equal(nowMinutes("", new Date(2026, 9, 1, 23, 0)), toMin("19:00"));
+});
+
+test("browserTimezone returns an IANA zone name", () => {
+  const tz = browserTimezone();
+  assert.ok(tz === "UTC" || tz.includes("/"), tz);
 });

@@ -18,7 +18,7 @@ export function UnderstandRow({ task, onRemove, onWhere, onDuration }: {
 }) {
   const [menu, setMenu] = useState<"where" | "time" | null>(null);
   const ask = needsDuration(task);
-  const approx = fmtDuration(task.durationMin);
+  const approx = `${task.durationMin} min`;
   const pills = factPills(task);
   const toggle = (m: "where" | "time") => setMenu((cur) => (cur === m ? null : m));
   return (

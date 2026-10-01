@@ -5,6 +5,8 @@ import { makeDb } from "../src/db/client";
 import { AiLimitError, carryOver, createDayWithTasks, getDay, getSettings, getUserById, incrementAiUsage, moveTaskToLater, NotFoundError, savePlan, updateTask } from "../src/db/queries";
 import { clearAuthAttempts, clearPassword, completeOnboarding, findUserByEmail, findUserByGoogleSub, recordAuthAttempt, setPassword, upsertGoogleUser } from "../src/db/queries/account";
 import { users } from "../src/db/schema";
+import { authenticatePassword } from "../src/lib/credentials";
+import { hashPassword } from "../src/lib/password";
 import { planDay } from "../src/lib/planner";
 import { DEFAULT_SETTINGS, type Plan } from "../src/lib/schemas";
 
@@ -97,6 +99,26 @@ try {
     assert.equal((await recordAuthAttempt(key, { limit: 5, windowMs: 900_000, now }, db)).count, 1);
   } finally {
     await clearAuthAttempts(key, db);
+  }
+
+  // password sign-in: same null for wrong password, unknown email and no password; locks after 5 failures
+  await setPassword(g1.id, await hashPassword("a long enough password"), db);
+  const ip = `test-${tag}`;
+  const good = { email: g1.email.toUpperCase(), password: "a long enough password" };
+  try {
+    assert.equal(await authenticatePassword(good, ip, db), g1.id);
+    assert.equal(await authenticatePassword({ ...good, password: "wrong password!!" }, ip, db), null);
+    assert.equal(await authenticatePassword({ email: `nobody-${tag}@test.invalid`, password: "wrong password!!" }, ip, db), null);
+    assert.equal(await authenticatePassword({ email: "not-an-email", password: "x" }, ip, db), null);
+    assert.equal(await authenticatePassword(good, ip, db), g1.id); // success cleared the email counter
+    for (let i = 0; i < 5; i++) await authenticatePassword({ ...good, password: "wrong password!!" }, ip, db);
+    assert.equal(await authenticatePassword(good, ip, db), null); // locked, even with the right password
+    await clearPassword(g1.id, db);
+    assert.equal(await authenticatePassword({ email: g1.email, password: "a long enough password" }, ip, db), null);
+  } finally {
+    await clearAuthAttempts(`email:${g1.email}`, db);
+    await clearAuthAttempts(`ip:${ip}`, db);
+    await clearAuthAttempts(`email:nobody-${tag}@test.invalid`, db);
   }
 
   console.log("db integration: all passed");

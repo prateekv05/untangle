@@ -90,3 +90,10 @@ export const aiUsage = pgTable("ai_usage", {
   day: date("day", { mode: "string" }).notNull(),
   calls: integer("calls").notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.userId, t.day] })]);
+
+/** Sign-in rate limiting: attempts per key ("ip:1.2.3.4", "email:a@b.c") per fixed time window. */
+export const authAttempts = pgTable("auth_attempts", {
+  key: text("key").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  count: integer("count").notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.key, t.windowStart] })]);

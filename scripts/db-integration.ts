@@ -7,6 +7,7 @@ import { clearAuthAttempts, clearPassword, completeOnboarding, findUserByEmail, 
 import { users } from "../src/db/schema";
 import { authenticatePassword } from "../src/lib/credentials";
 import { hashPassword } from "../src/lib/password";
+import { applyMeUpdate } from "../src/lib/me";
 import { planDay } from "../src/lib/planner";
 import { DEFAULT_SETTINGS, type Plan } from "../src/lib/schemas";
 
@@ -100,6 +101,16 @@ try {
   } finally {
     await clearAuthAttempts(key, db);
   }
+
+  // /api/me logic: finishing needs a name; name and gender save step by step
+  const u3 = await mk("c");
+  ids.push(u3.id);
+  await assert.rejects(applyMeUpdate(u3.id, { complete: true }, db));
+  assert.equal((await applyMeUpdate(u3.id, { name: "Riley" }, db)).onboarded, false);
+  assert.equal((await applyMeUpdate(u3.id, { gender: "man" }, db)).gender, "man");
+  assert.equal((await applyMeUpdate(u3.id, { gender: null }, db)).gender, null);
+  const fin = await applyMeUpdate(u3.id, { complete: true }, db);
+  assert.deepEqual([fin.name, fin.onboarded], ["Riley", true]);
 
   // password sign-in: same null for wrong password, unknown email and no password; locks after 5 failures
   await setPassword(g1.id, await hashPassword("a long enough password"), db);

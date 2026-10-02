@@ -1,6 +1,6 @@
 /** Browser-side calls to the account routes. Each rejects on a non-2xx so callers can roll an optimistic update back. */
 import type { Preset } from "./guess";
-import type { Settings } from "./schemas";
+import type { Question, Settings, Task, UnderstandResult } from "./schemas";
 
 export class ApiError extends Error {
   constructor(public readonly status: number) {
@@ -29,3 +29,17 @@ export const getPresets = async () => (await call<PresetRow[]>("/api/presets")).
 export const postPreset = async (p: Omit<Preset, "id">) =>
   toUiPreset(await call<PresetRow>("/api/presets", { method: "POST", body: JSON.stringify({ verb: p.phrase, location: p.location, kind: p.kind, defaultDurationMin: p.durationMin }) }));
 export const deletePreset = (id: string) => call<void>(`/api/presets/${id}`, { method: "DELETE" });
+
+export type UnderstandResponse = {
+  dayId: string;
+  date: string;
+  mode: "workday" | "dayoff";
+  planFor: UnderstandResult["planFor"];
+  tasks: Task[];
+  questions: Question[];
+  groupings: UnderstandResult["groupings"];
+  model: string;
+};
+export const postUnderstand = (text: string) => call<UnderstandResponse>("/api/understand", { method: "POST", body: JSON.stringify({ text }) });
+export const patchTask = (id: string, patch: Partial<Pick<Task, "location" | "durationMin" | "durationSource" | "fixedStart" | "due" | "title" | "kind">>) =>
+  call<Task>(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(patch) });

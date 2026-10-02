@@ -24,16 +24,21 @@ export function thinkingSteps(kind: "dump" | "plan", tasks: Task[], n: number, m
   };
 }
 
-/** Steps tick on in order. Phase 1: time-based; later phases finish early if the call returns early. */
-export function ThinkingScreen({ title, steps, onDone, stepMs = STEP_MS }: { title: string; steps: string[]; onDone: () => void; stepMs?: number }) {
+/** Steps tick on in order. The last one keeps spinning until `ready` (the real call has returned), then the screen finishes. */
+export function ThinkingScreen({ title, steps, onDone, ready = true, stepMs = STEP_MS }: { title: string; steps: string[]; onDone: () => void; ready?: boolean; stepMs?: number }) {
   const [done, setDone] = useState(0);
   const finish = useRef(onDone);
   useEffect(() => { finish.current = onDone; });
   useEffect(() => {
-    if (done >= steps.length) { const t = setTimeout(() => finish.current(), 450); return () => clearTimeout(t); }
+    if (done >= steps.length) {
+      if (!ready) return; // all steps shown, still waiting on the call
+      const t = setTimeout(() => finish.current(), 450);
+      return () => clearTimeout(t);
+    }
+    if (!ready && done === steps.length - 1) return; // keep the last step spinning
     const t = setTimeout(() => setDone((d) => d + 1), stepMs);
     return () => clearTimeout(t);
-  }, [done, steps.length, stepMs]);
+  }, [done, steps.length, stepMs, ready]);
   return (
     <div className="flex min-h-dvh flex-col">
       <TopBar hideSettings />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { Grouping } from "@/lib/flow";
 import type { Preset } from "@/lib/guess";
 import type { PlanMode } from "@/lib/planner";
 import type { Question, Task } from "@/lib/schemas";
@@ -13,8 +14,8 @@ import { SegmentedControl } from "../segmented-control";
 import { TopBar } from "../top-bar";
 import { UnderstandRow } from "../understand-row";
 
-export function UnderstandScreen({ tasks, questions, mode, presets, onMode, onAnswer, onRemove, onWhere, onDuration, onAdd, onBuild, onBack, onSettings }: {
-  tasks: Task[]; questions: Question[]; mode: PlanMode; presets: Preset[];
+export function UnderstandScreen({ tasks, questions, groupings = [], mode, presets, onMode, onAnswer, onRemove, onWhere, onDuration, onAdd, onBuild, onBack, onSettings }: {
+  tasks: Task[]; questions: Question[]; groupings?: Grouping[]; mode: PlanMode; presets: Preset[];
   onMode: (m: PlanMode) => void; onAnswer: (q: Question, v: string | number | null) => void; onRemove: (id: string) => void;
   onWhere: (id: string, w: Where) => void; onDuration: (id: string, min: number | null) => void;
   onAdd: (t: Omit<Task, "id">) => void; onBuild: () => void; onBack: () => void; onSettings: () => void;
@@ -27,7 +28,7 @@ export function UnderstandScreen({ tasks, questions, mode, presets, onMode, onAn
         <h1 className="m-0 text-[32px] font-bold leading-9 tracking-[-0.02em]">Here&apos;s what I understood</h1>
         <p className="mb-[18px] mt-2 text-ink-muted">Tap anything that&apos;s off to fix it.</p>
         <QuestionCard questions={questions} onAnswer={onAnswer} />
-        <RelationshipCard tasks={tasks} />
+        <RelationshipCard tasks={tasks} groupings={groupings} />
         <div className="mb-3.5">
           <SegmentedControl label="Day type" value={mode} onChange={onMode} options={[{ value: "workday", label: "Workday" }, { value: "dayoff", label: "Day off" }]} />
         </div>

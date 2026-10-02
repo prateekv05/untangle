@@ -5,7 +5,7 @@
  */
 import type { Preset } from "./guess";
 import { diffStarts, planDay, type PlanMode, type PlanOptions } from "./planner";
-import { DEFAULT_SETTINGS, type Block, type Plan, type Question, type ReplanConstraints, type Settings, type Task } from "./schemas";
+import { DEFAULT_SETTINGS, type Block, type Plan, type Question, type ReplanConstraints, type Settings, type Task, type UnderstandResult } from "./schemas";
 import { fmtDuration, toHHMM, toMin } from "./time";
 
 export type Screen = "dump" | "listening" | "thinking" | "understand" | "plan";
@@ -19,6 +19,7 @@ export type SheetState =
   | { type: "presets" }
   | { type: "password" };
 
+export type Grouping = UnderstandResult["groupings"][number];
 export interface Moved { taskId: string; to: string }
 export interface Replan {
   at: string;
@@ -38,6 +39,8 @@ export interface FlowState {
   text: string;
   tasks: Task[];
   questions: Question[];
+  /** What belongs together, as the model saw it. Shown on Understand. */
+  groupings: Grouping[];
   mode: PlanMode;
   settings: Settings;
   presets: Preset[];
@@ -62,6 +65,7 @@ export const initialState = (text = ""): FlowState => ({
   text,
   tasks: [],
   questions: [],
+  groupings: [],
   mode: "workday",
   settings: DEFAULT_SETTINGS,
   presets: [],
@@ -83,7 +87,7 @@ export type Action =
   | { type: "text"; text: string }
   | { type: "screen"; screen: Screen }
   | { type: "think"; kind: ThinkingKind }
-  | { type: "understood"; tasks: Task[]; questions: Question[]; mode: PlanMode }
+  | { type: "understood"; tasks: Task[]; questions: Question[]; mode: PlanMode; groupings?: Grouping[] }
   | { type: "answer"; question: Question; value: string | number | null }
   | { type: "patchTask"; taskId: string; patch: Partial<Task>; now: number }
   | { type: "removeTask"; taskId: string; now: number }
@@ -138,7 +142,7 @@ export function reducer(s: FlowState, a: Action): FlowState {
     case "think":
       return { ...s, screen: "thinking", thinking: a.kind, sheet: null };
     case "understood":
-      return { ...s, screen: "understand", tasks: a.tasks, questions: a.questions, mode: a.mode, plan: null, done: [], moved: [], replan: null, undo: null, nextId: a.tasks.length + 1 };
+      return { ...s, screen: "understand", tasks: a.tasks, questions: a.questions, groupings: a.groupings ?? [], mode: a.mode, plan: null, done: [], moved: [], replan: null, undo: null, nextId: a.tasks.length + 1 };
     case "answer": {
       const q = a.question;
       const questions = s.questions.filter((x) => !(x.taskId === q.taskId && x.type === q.type));

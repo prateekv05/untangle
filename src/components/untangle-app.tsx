@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useState, useSyncExternalStore } from "react";
-import { deletePreset, getPresets, getSettings, postPreset, putSettings } from "@/lib/api-client";
-import { APPOINTMENT_DUMP, EXAMPLE_DUMP, fixtureTasksFor } from "@/fixtures/example";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
+import { ApiError, deletePreset, getPresets, getSettings, patchTask, postPreset, postUnderstand, putSettings, type UnderstandResponse } from "@/lib/api-client";
+import { APPOINTMENT_DUMP, EXAMPLE_DUMP } from "@/fixtures/example";
 import { interpretReplan } from "@/fixtures/replan";
 import { browserTimezone, nowMinutes } from "@/lib/clock";
 import { initialState, reducer } from "@/lib/flow";
-import { countThings, deriveQuestions, tasksFromText } from "@/lib/guess";
+import { countThings } from "@/lib/guess";
 import type { Preset } from "@/lib/guess";
-import type { Task } from "@/lib/schemas";
+import type { Question, Task } from "@/lib/schemas";
 import { toHHMM } from "@/lib/time";
 import type { Where } from "@/lib/where";
 import { DumpScreen } from "./screens/dump-screen";
@@ -32,8 +32,8 @@ const EXAMPLES = [
 ];
 
 /**
- * Every screen as one client state machine (src/lib/flow.ts). Understanding and planning still run on fixtures
- * until the AI phases; settings and presets are the signed-in account's own and are saved through /api.
+ * Every screen as one client state machine (src/lib/flow.ts). Understanding runs on the real model (/api/understand);
+ * planning still runs on fixtures until Phase 5; settings and presets are the signed-in account's own and are saved through /api.
  */
 export function UntangleApp({ name = null }: { name?: string | null }) {
   const [s, dispatch] = useReducer(reducer, undefined, () => {
@@ -103,16 +103,59 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   const closeSheet = () => dispatch({ type: "sheet", sheet: null });
   const openSettings = () => dispatch({ type: "sheet", sheet: { type: "settings" } });
 
+  // The understand call runs while the thinking screen plays. `run` guards against a stale answer after a retry.
+  const understandRun = useRef(0);
+  const understood = useRef<UnderstandResponse | null>(null);
+  const [understandReady, setUnderstandReady] = useState(false);
+  const startUnderstand = (text: string) => {
+    const run = ++understandRun.current;
+    understood.current = null;
+    setUnderstandReady(false);
+    setNotice(null);
+    dispatch({ type: "text", text });
+    dispatch({ type: "think", kind: "dump" });
+    postUnderstand(text.trim())
+      .then((res) => {
+        if (run !== understandRun.current) return;
+        understood.current = res;
+        setUnderstandReady(true);
+      })
+      .catch((e) => {
+        if (run !== understandRun.current) return;
+        // The text stays in the box. Nothing here is a dead end: the user can try again straight away.
+        setNotice(e instanceof ApiError && e.status === 429
+          ? "That's today's limit for reading lists. Your text is saved. Try again tomorrow."
+          : "I couldn't read that just now. Your text is saved. Try again.");
+        dispatch({ type: "screen", screen: "dump" });
+      });
+  };
   const submitDump = () => {
     if (countThings(s.text) < 1) return;
-    setNotice(null);
-    dispatch({ type: "think", kind: "dump" });
+    startUnderstand(s.text);
   };
   const finishDumpThinking = useCallback(() => {
-    const tasks: Task[] = fixtureTasksFor(s.text) ?? tasksFromText(s.text, s.presets);
-    const isWorkday = s.settings.workDays.includes(new Date().getDay());
-    dispatch({ type: "understood", tasks, questions: deriveQuestions(tasks), mode: isWorkday ? "workday" : "dayoff" });
-  }, [s.text, s.presets, s.settings.workDays]);
+    const res = understood.current;
+    if (!res) return;
+    dispatch({ type: "understood", tasks: res.tasks, questions: res.questions, groupings: res.groupings, mode: res.mode });
+  }, []);
+
+  // Understand edits are saved to the day as they happen. Tasks added here have no saved id yet (Phase 5 syncs them).
+  const isSaved = (id: string) => /^[0-9a-f-]{36}$/.test(id);
+  const savePatch = (taskId: string, patch: Partial<Task>) => {
+    if (!isSaved(taskId)) return;
+    patchTask(taskId, patch).catch(() => dispatch({ type: "toast", text: "I couldn't save that change. It still applies here." }));
+  };
+  const answer = (question: Question, value: string | number | null) => {
+    dispatch({ type: "answer", question, value });
+    if (value === null) return;
+    if (question.type === "due") savePatch(question.taskId, { due: value as Task["due"] });
+    else if (question.type === "duration") savePatch(question.taskId, { durationMin: value as number, durationSource: "user" });
+    else savePatch(question.taskId, { fixedStart: String(value), durationSource: "user" });
+  };
+  const patch = (taskId: string, p: Partial<Task>) => {
+    dispatch({ type: "patchTask", taskId, patch: p, now: now() });
+    savePatch(taskId, p);
+  };
   const finishPlanThinking = useCallback(() => dispatch({ type: "build", now: now() }), [now]);
 
   const sheet = s.sheet;
@@ -125,24 +168,24 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
     screen = (
       <ListeningScreen
         onClose={() => dispatch({ type: "screen", screen: "dump" })}
-        onDone={() => { dispatch({ type: "text", text: `${s.text.trim() ? `${s.text.trim()}\n` : ""}${EXAMPLE_DUMP}.` }); dispatch({ type: "think", kind: "dump" }); }}
-        onLimit={() => { dispatch({ type: "text", text: EXAMPLE_DUMP }); dispatch({ type: "think", kind: "dump" }); dispatch({ type: "toast", text: "That's the limit. I'm working with what I heard." }); }}
+        onDone={() => startUnderstand(`${s.text.trim() ? `${s.text.trim()}\n` : ""}${EXAMPLE_DUMP}.`)}
+        onLimit={() => { startUnderstand(EXAMPLE_DUMP); dispatch({ type: "toast", text: "That's the limit. I'm working with what I heard." }); }}
         startAt={Number(new URLSearchParams(search).get("listen") ?? 0)}
       />
     );
   } else if (s.screen === "thinking") {
     const preview = s.thinking === "dump" ? [] : s.tasks;
     const { title, steps } = thinkingSteps(s.thinking, preview, countThings(s.text), s.mode, s.settings);
-    screen = <ThinkingScreen key={s.thinking} title={title} steps={steps} onDone={s.thinking === "dump" ? finishDumpThinking : finishPlanThinking} />;
+    screen = <ThinkingScreen key={s.thinking} title={title} steps={steps} ready={s.thinking === "dump" ? understandReady : true} onDone={s.thinking === "dump" ? finishDumpThinking : finishPlanThinking} />;
   } else if (s.screen === "understand") {
     screen = (
       <UnderstandScreen
-        tasks={s.tasks} questions={s.questions} mode={s.mode} presets={s.presets}
+        tasks={s.tasks} questions={s.questions} groupings={s.groupings} mode={s.mode} presets={s.presets}
         onMode={(mode) => dispatch({ type: "mode", mode })}
-        onAnswer={(question, value) => dispatch({ type: "answer", question, value })}
+        onAnswer={answer}
         onRemove={(taskId) => dispatch({ type: "removeTask", taskId, now: now() })}
-        onWhere={(taskId, w: Where) => dispatch({ type: "patchTask", taskId, patch: { location: w }, now: now() })}
-        onDuration={(taskId, min) => dispatch({ type: "patchTask", taskId, patch: min === null ? { durationSource: "estimated" } : { durationMin: min, durationSource: "user" }, now: now() })}
+        onWhere={(taskId, w: Where) => patch(taskId, { location: w })}
+        onDuration={(taskId, min) => patch(taskId, min === null ? { durationSource: "estimated" } : { durationMin: min, durationSource: "user" })}
         onAdd={(task) => dispatch({ type: "addTask", task, now: now() })}
         onBuild={() => dispatch({ type: "think", kind: "plan" })}
         onBack={() => dispatch({ type: "screen", screen: "dump" })}
@@ -184,7 +227,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
       {editTask && (
         <EditSheet
           task={editTask} onClose={closeSheet}
-          onSave={(patch) => { dispatch({ type: "patchTask", taskId: editTask.id, patch, now: now() }); closeSheet(); }}
+          onSave={(p) => { patch(editTask.id, p); closeSheet(); }}
           onDelete={() => dispatch({ type: "removeTask", taskId: editTask.id, now: now() })}
         />
       )}

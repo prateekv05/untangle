@@ -15,7 +15,7 @@ test("signed out, every page is the Welcome screen", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Untangle my day" })).toHaveCount(0);
 });
 
-test("a new account is onboarded once, then lands on Dump with its name", async ({ page, context, baseURL }) => {
+test.describe("onboarding timezone", () => { test.use({ timezoneId: "Asia/Tokyo" }); test("a new account is onboarded once, then lands on Dump with its name; its zone is saved", async ({ page, context, baseURL }) => {
   const user = await createUser({ onboarded: false });
   await signInAs(context, user, baseURL!);
 
@@ -45,7 +45,9 @@ test("a new account is onboarded once, then lands on Dump with its name", async 
   await page.goto("/welcome");
   await expect(page).toHaveURL(/\/$/);
   await expect(dumpHeading(page, "Sam")).toBeVisible();
-});
+  const settings = await (await page.request.get("/api/settings")).json();
+  expect(settings.timezone).toBe("Asia/Tokyo"); // saved once by onboarding, not guessed later
+}); });
 
 test("a returning account goes straight to Dump on a second browser", async ({ browser, baseURL }) => {
   const user = await createUser({ onboarded: true, name: "Alex" });
@@ -121,3 +123,52 @@ test("a failed save puts the setting back and says so", async ({ page, context, 
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("dialog", { name: "Settings" }).getByLabel("Work starts")).toHaveValue("09:00");
 });
+
+test("when settings fail to load, Settings offers a retry and no form to save defaults with", async ({ page, context, baseURL }) => {
+  const user = await createUser({ onboarded: true });
+  await signInAs(context, user, baseURL!);
+  let fail = true;
+  await page.route("**/api/settings", (route) => (fail && route.request().method() === "GET" ? route.fulfill({ status: 500, json: { error: "server_error" } }) : route.continue()));
+  await page.goto("/");
+  await expect(dumpHeading(page)).toBeVisible();
+
+  await page.getByRole("button", { name: "Settings" }).click();
+  const dialog = page.getByRole("dialog", { name: "Settings" });
+  await expect(dialog.getByText("I couldn't load your settings")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Save" })).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Sign out" })).toBeVisible();
+
+  fail = false;
+  await dialog.getByRole("button", { name: "Try again" }).click();
+  await expect(dialog.getByLabel("Work starts")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Save" })).toBeVisible();
+});
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`Welcome and onboarding: axe finds no serious issues, screenshots at 390px, ${scheme}`, async ({ page, context, baseURL }) => {
+    const { default: AxeBuilder } = await import("@axe-core/playwright");
+    const out = process.env.SHOT_DIR ?? "test-results/screens";
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    const check = async (label: string) => {
+      const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+      const bad = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+      expect(bad.map((v) => `${label}: ${v.id} ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`), label).toEqual([]);
+      await page.screenshot({ path: `${out}/${label}-${scheme}.png`, fullPage: true });
+    };
+
+    await page.goto("/welcome");
+    await page.getByRole("button", { name: "Continue with Google" }).waitFor();
+    await check("08-welcome");
+    await page.getByRole("button", { name: /Sign in with a password/ }).click();
+    await page.getByLabel("Email").waitFor();
+    await check("08-welcome-password");
+
+    const user = await createUser({ onboarded: false });
+    await signInAs(context, user, baseURL!);
+    for (const [path, heading] of [["name", "What should I call you?"], ["gender", "How do you identify?"], ["dump", "Say everything on your mind."], ["plan", "Get a day you can actually do."], ["replan", "When life changes, just say so."]] as const) {
+      await page.goto(`/welcome/${path}`);
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+      await check(`09-onboarding-${path}`);
+    }
+  });
+}

@@ -58,3 +58,10 @@ export async function saveSettings(userId: string, s: Settings, db: Db = getDb()
     .returning();
   return { workStart: row.workStart, workEnd: row.workEnd, workDays: row.workDays, wake: row.wake, sleep: row.sleep, timezone: row.timezone };
 }
+
+/** Sets only the timezone, creating default settings if the account has none yet. */
+export async function setTimezone(userId: string, timezone: string, db: Db = getDb()) {
+  await db.execute(sql`
+    insert into settings (user_id, timezone) select id, ${timezone} from users where id = ${userId}
+    on conflict (user_id) do update set timezone = excluded.timezone`);
+}

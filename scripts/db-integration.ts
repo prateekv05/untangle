@@ -156,6 +156,12 @@ try {
   assert.deepEqual(await getSettings(u3.id, db), next);
   assert.deepEqual(await getSettings(a.id, db), DEFAULT_SETTINGS);
 
+  // onboarding saves the device's zone without touching the other settings
+  const u4 = await mk("d");
+  ids.push(u4.id);
+  await applyMeUpdate(u4.id, { name: "Kai", timezone: "Asia/Tokyo", complete: true }, db);
+  assert.deepEqual(await getSettings(u4.id, db), { ...DEFAULT_SETTINGS, timezone: "Asia/Tokyo" });
+
   console.log("db integration: all passed");
 } finally {
   for (const id of ids) await db.delete(users).where(eq(users.id, id)); // cascades

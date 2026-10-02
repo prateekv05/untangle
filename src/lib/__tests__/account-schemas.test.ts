@@ -23,3 +23,8 @@ test("PasswordUpdate needs at least 10 characters and nothing else", () => {
     assert.equal(PasswordUpdate.safeParse(bad).success, false, JSON.stringify(bad));
   }
 });
+
+test("MeUpdate takes a real timezone only", () => {
+  assert.equal(MeUpdate.parse({ timezone: "Europe/London", complete: true }).timezone, "Europe/London");
+  for (const timezone of ["Mars/Olympus", "", "x".repeat(65)]) assert.equal(MeUpdate.safeParse({ timezone }).success, false, timezone);
+});

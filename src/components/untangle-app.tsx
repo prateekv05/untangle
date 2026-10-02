@@ -51,24 +51,23 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   // Carry-over needs a backend (Phase 6); in Phase 1 it only shows with ?carry=1 so the card can be seen.
   const carried = new URLSearchParams(search).get("carry") === "1" ? ["Gym", "Buy toothpaste"].filter((c) => !taken.includes(c)) : [];
 
-  // Settings and presets belong to the account: load them once, then save changes optimistically and roll back on failure.
+  // Settings and presets belong to the account: load them, then save changes optimistically and roll back on failure.
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
     Promise.all([getSettings(), getPresets()])
       .then(([settings, presets]) => {
         if (!live) return;
-        // A brand-new account has the default "UTC"; adopt this device's zone until the user chooses one.
-        dispatch({ type: "settings", settings: settings.timezone === "UTC" ? { ...settings, timezone: browserTimezone() } : settings });
+        dispatch({ type: "settings", settings });
         dispatch({ type: "presets", presets });
         setAccount("ready");
       })
       .catch(() => {
-        if (!live) return;
-        setAccount("failed"); // still lets Settings open, so signing out works
-        dispatch({ type: "toast", text: "I couldn't load your settings. Check your connection." });
+        if (live) setAccount("failed"); // Settings still opens (Sign out lives there) but shows no editable values
       });
     return () => { live = false; };
-  }, []);
+  }, [attempt]);
+  const retryLoad = () => { setAccount("loading"); setAttempt((n) => n + 1); };
   const saveSettings = (settings: typeof s.settings) => {
     const before = s.settings;
     dispatch({ type: "settings", settings });
@@ -201,7 +200,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         />
       )}
       {s.sheet?.type === "settings" && account !== "loading" && (
-        <SettingsSheet settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={saveSettings} />
+        <SettingsSheet loadFailed={account === "failed"} onRetry={retryLoad} settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={saveSettings} />
       )}
       {s.sheet?.type === "password" && <PasswordSheet hasPassword={hasPassword} onClose={() => dispatch({ type: "sheet", sheet: { type: "settings" } })} onDone={(text) => { dispatch({ type: "sheet", sheet: { type: "settings" } }); dispatch({ type: "toast", text }); }} />}
       {s.sheet?.type === "presets" && <PresetsSheet presets={s.presets} onAdd={addPreset} onRemove={removePreset} onClose={closeSheet} />}

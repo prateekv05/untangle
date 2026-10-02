@@ -20,7 +20,7 @@ const zones = (current: string): string[] => {
 };
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export function SettingsSheet({ settings, presetCount, onSave, onPresets, onPassword, onClose }: { settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onPassword: (hasPassword: boolean) => void; onClose: () => void }) {
+export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSave, onPresets, onPassword, onClose }: { loadFailed: boolean; onRetry: () => void; settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onPassword: (hasPassword: boolean) => void; onClose: () => void }) {
   const [s, setS] = useState(settings);
   const [pref, setPref] = useState<ThemePref>(() => themePreference());
   const id = useId();
@@ -36,6 +36,12 @@ export function SettingsSheet({ settings, presetCount, onSave, onPresets, onPass
   return (
     <Sheet title="Settings" onClose={onClose} tall>
       <AccountSection onPassword={onPassword} />
+      {loadFailed ? (
+        <div className="mt-2">
+          <p role="alert" className="voice m-0 text-ask-ink">I couldn&apos;t load your settings. Check your connection, then try again.</p>
+          <div className="mt-4"><Button type="button" onClick={onRetry}>Try again</Button></div>
+        </div>
+      ) : (
       <form onSubmit={(e) => { e.preventDefault(); onSave(s); }}>
         <div className="mb-4 flex gap-3">{time("workStart", "Work starts")}{time("workEnd", "Work ends")}</div>
         <p id={`${id}-days`} className={label}>Working days</p>
@@ -60,6 +66,7 @@ export function SettingsSheet({ settings, presetCount, onSave, onPresets, onPass
         <p className="voice-sm m-0 mt-4 text-ink-muted">Your voice is turned into text and then discarded.</p>
         <div className="mt-5"><Button type="submit">Save</Button></div>
       </form>
+      )}
     </Sheet>
   );
 }

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { cn } from "@/lib/cn";
+import { browserTimezone } from "@/lib/clock";
 import { GENDER_OPTIONS, isExplainer, nextStep, prevStep, stepNumber, STEPS, type Step } from "@/lib/onboarding";
 import { Button } from "./button";
 import { Icon } from "./icon";
@@ -43,7 +44,7 @@ export function OnboardingStep({ step, initialName, initialGender }: { step: Ste
 
   async function finish() {
     // Skip on an explainer also finishes: the name was saved on step 1.
-    const ok = await saveMe({ complete: true });
+    const ok = await saveMe({ complete: true, timezone: browserTimezone() }); // the zone is saved once, here, not guessed later
     if (!ok) return fail();
     router.replace("/");
     router.refresh();

@@ -1,16 +1,8 @@
 /** Zod input schemas for the account routes. Every route parses with one of these before touching the database. */
 import { z } from "zod";
 import { isIsoDate } from "../db/queries/helpers";
+import { isTimezone } from "./timezone";
 import { Due, HHMM, Kind, Location, Settings } from "./schemas";
-
-const isTimezone = (tz: string): boolean => {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 export const SettingsInput = Settings.extend({
   workDays: z.array(z.number().int().min(0).max(6)).max(7).transform((d) => [...new Set(d)].sort((a, b) => a - b)),

@@ -10,7 +10,7 @@ import { getEnv } from "@/lib/env";
 import { changeLines, planReplanChanges } from "@/lib/replan";
 import { diffStarts } from "@/lib/planner";
 import { requireUser } from "@/lib/session";
-import { toMin } from "@/lib/time";
+import { toHHMM, toMin } from "@/lib/time";
 import { addDays, localClock } from "@/lib/timezone";
 import { addTaskToDay, getDayState, getSettings, incrementAiUsage, savePlan, setTaskStatus } from "@/db/queries";
 import { InputError, NotFoundError } from "@/db/queries/helpers";
@@ -66,10 +66,11 @@ export async function POST(request: Request) {
 
     const was = diffStarts(previous, result.plan);
     const titles = new Map(after.rows.map((r) => [r.id, r.title]));
+    const lines = changeLines(previous, result.plan, titles, was, changes.limits, added.map((t) => t.id), changes.drop);
     const view: ReplanView = {
       dayId, mode: after.day.mode, plan: result.plan, version, source: result.source, model: result.model, plannedAt: clock.time,
       tasks: after.rows.flatMap(({ status, ...t }) => (status === "deleted" ? [] : [{ ...t, status, movedTo: t.movedTo }])),
-      changes: { at: clock.time, was, lines: changeLines(previous, result.plan, titles, was, changes.limits, added.map((t) => t.id), changes.drop) },
+      changes: { at: clock.time, was, lines: lines.length ? lines : [`Rebuilt the rest of your day from ${toHHMM(planFrom)}`] },
     };
     return Response.json(view);
   } catch (e) {

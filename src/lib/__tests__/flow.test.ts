@@ -5,7 +5,6 @@ import type { DayView } from "../day-response";
 import { validatePlan } from "../validate-plan";
 import { countThings, deriveQuestions, guessTask, parseTime, splitDump, tasksFromText } from "../guess";
 import { appointmentTasks, EXAMPLE_DUMP, exampleTasks, fixtureTasksFor } from "../../fixtures/example";
-import { interpretReplan } from "../../fixtures/replan";
 import { browserTimezone, nowMinutes } from "../clock";
 import { DEFAULT_SETTINGS } from "../schemas";
 import { toMin } from "../time";
@@ -90,29 +89,23 @@ test("add task re-plans and the new task is scheduled or dropped", () => {
   assert.ok(s.plan!.blocks.some((b) => b.taskId === id) || s.plan!.dropped.some((d) => d.taskId === id));
 });
 
-test("re-plan: finished stays, new meeting is fixed, undo restores the old plan", () => {
+test("a saved re-plan swaps the day in, shows what changed and can be undone locally", () => {
   let s = built();
   s = reducer(s, { type: "toggleDone", taskId: "res" });
   const old = s.plan;
-  const c = interpretReplan("I didn't finish SQL and I have a meeting at 2.", s.tasks.filter((t) => !s.done.includes(t.id)), toMin("11:45"))!;
-  assert.deepEqual(c.unfinished.map((u) => u.taskId), ["sql"]);
-  assert.equal(c.newEvents[0].start, "14:00");
-  s = reducer(s, { type: "applyReplan", constraints: c, said: "x", now: toMin("11:45") });
+  const view = {
+    dayId: "d", mode: s.mode, plan: { ...s.plan!, decisions: [] }, version: 2, source: "llm" as const, model: "m", plannedAt: "11:45",
+    tasks: s.tasks.map((t) => ({ ...t, status: t.id === "res" ? ("done" as const) : ("open" as const), movedTo: null })),
+    changes: { at: "11:45", was: { sql: "09:00" }, lines: ["SQL moved from 09:00"] },
+  };
+  s = reducer(s, { type: "replanned", view, said: "I didn't finish SQL" });
   assert.equal(s.replan?.at, "11:45");
+  assert.equal(s.replan?.said, "I didn't finish SQL");
   assert.deepEqual(s.replan?.doneIds, ["res"]);
-  assert.equal(s.plan!.blocks.find((b) => b.taskId.startsWith("ev"))?.start, "14:00");
-  s.plan!.blocks.filter((b) => b.taskId !== "res" && !b.taskId.startsWith("ev")).forEach((b) => assert.ok(toMin(b.start) >= toMin("11:45")));
-  assert.ok(s.replan!.lines.length >= 1 && s.replan!.lines.length <= 5);
+  assert.deepEqual(s.replan?.was, { sql: "09:00" });
+  assert.equal(s.version, 2);
+  assert.equal(s.toast?.undo, true);
   assert.deepEqual(reducer(s, { type: "undo" }).plan, old);
-});
-
-test("interpretReplan handles the chips and returns null for nonsense", () => {
-  const open = exampleTasks();
-  assert.equal(interpretReplan("I'm running 90 minutes late.", open, 700)?.delayMin, 90);
-  assert.equal(interpretReplan("I only have 3 hours left.", open, 700)?.capacityMin, 180);
-  assert.deepEqual(interpretReplan("I must finish the app today.", open, 700)?.mustFinishTaskIds, ["app"]);
-  assert.equal(interpretReplan("Make it a lighter afternoon.", open, 700)?.lighterAfter, "12:00");
-  assert.equal(interpretReplan("hmm", open, 700), null);
 });
 
 test("splitDump, counts and time parsing", () => {

@@ -1,6 +1,6 @@
 /** Browser-side calls to the account routes. Each rejects on a non-2xx so callers can roll an optimistic update back. */
 import type { Preset } from "./guess";
-import type { DayView } from "./day-response";
+import type { DayView, ReplanView } from "./day-response";
 import type { DayEditBody } from "./api-schemas";
 import type { Plan, Question, Settings, Task, UnderstandResult } from "./schemas";
 
@@ -71,3 +71,7 @@ export const postDayUndo = (dayId: string, version: number, tasks: DayView["task
     method: "POST",
     body: JSON.stringify({ dayId, version, tasks: tasks.map(({ id, title, location, kind, durationMin, durationSource, fixedStart, due, status, movedTo }) => ({ id, title, location, kind, durationMin, durationSource, fixedStart, due, status, movedTo })) }),
   });
+
+/** Tell Untangle what changed in plain words. The server reads it, rebuilds the rest of today and answers with the new day and what changed. */
+export const postReplan = (dayId: string, instruction: string) =>
+  call<ReplanView>("/api/replan", { method: "POST", body: JSON.stringify({ dayId, instruction }) });

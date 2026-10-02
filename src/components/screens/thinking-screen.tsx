@@ -8,7 +8,10 @@ import { TopBar } from "../top-bar";
 
 const STEP_MS = 700;
 
-export function thinkingSteps(kind: "dump" | "plan", tasks: Task[], n: number, mode: PlanMode, settings: Settings): { title: string; steps: string[] } {
+export function thinkingSteps(kind: "dump" | "plan" | "replan", tasks: Task[], n: number, mode: PlanMode, settings: Settings, at?: string): { title: string; steps: string[] } {
+  if (kind === "replan") {
+    return { title: "Rebuilding the rest of your day", steps: ["Reading what changed", "Keeping what you finished", at ? `Planning again from ${at}` : "Planning again from now", "Writing down why"] };
+  }
   if (kind === "dump") {
     return { title: "Reading your list", steps: [`Reading ${n} ${n === 1 ? "thing" : "things"}`, "Working out where each one happens", "Finding what belongs together"] };
   }

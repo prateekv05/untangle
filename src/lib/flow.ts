@@ -4,14 +4,14 @@
  * shown is a real valid plan even though nothing here talks to a backend.
  */
 import type { Preset } from "./guess";
-import { diffStarts, planDay, type PlanMode, type PlanOptions } from "./planner";
-import { DEFAULT_SETTINGS, type Block, type Plan, type Question, type ReplanConstraints, type Settings, type Task, type UnderstandResult } from "./schemas";
+import { planDay, type PlanMode, type PlanOptions } from "./planner";
+import { DEFAULT_SETTINGS, type Block, type Plan, type Question, type Settings, type Task, type UnderstandResult } from "./schemas";
 import { toTask } from "./day-edit";
-import type { DayView } from "./day-response";
-import { fmtDuration, toHHMM, toMin } from "./time";
+import type { DayView, ReplanView } from "./day-response";
+import { fmtDuration, toHHMM } from "./time";
 
 export type Screen = "dump" | "listening" | "thinking" | "understand" | "plan";
-export type ThinkingKind = "dump" | "plan";
+export type ThinkingKind = "dump" | "plan" | "replan";
 export type SheetState =
   | null
   | { type: "edit"; taskId: string }
@@ -113,7 +113,8 @@ export type Action =
   | { type: "undone"; view: DayView }
   | { type: "toggleDone"; taskId: string }
   | { type: "expand"; taskId: string | null }
-  | { type: "applyReplan"; constraints: ReplanConstraints; said: string; now: number }
+  /** A saved re-plan from /api/replan: swap everything in place, show what changed and offer Undo. */
+  | { type: "replanned"; view: ReplanView; said: string }
   | { type: "undo" }
   | { type: "sheet"; sheet: SheetState }
   | { type: "toast"; text: string | null; undo?: boolean; ms?: number }
@@ -211,35 +212,11 @@ export function reducer(s: FlowState, a: Action): FlowState {
       return { ...s, entrance: false, done: s.done.includes(a.taskId) ? s.done.filter((d) => d !== a.taskId) : [...s.done, a.taskId] };
     case "expand":
       return { ...s, expanded: s.expanded === a.taskId ? null : a.taskId, entrance: false };
-    case "applyReplan": {
-      const c = a.constraints;
-      const snap = SNAP(s);
-      const dropIds = new Set(c.dropTaskIds);
-      const events: Task[] = c.newEvents.map((e, i) => ({
-        id: `ev${s.nextId + i}`, title: e.title, location: e.location, kind: "fixed", durationMin: Math.max(5, e.durationMin),
-        durationSource: "user", fixedStart: e.start, due: null,
-      }));
-      const tasks = [...s.tasks.filter((t) => !dropIds.has(t.id)), ...events];
-      const unfinished = new Set(c.unfinished.map((u) => u.taskId));
-      const done = s.done.filter((d) => !unfinished.has(d) && !dropIds.has(d));
-      const overrides: Record<string, number> = {};
-      c.unfinished.forEach((u) => { if (u.remainingMin) overrides[u.taskId] = u.remainingMin; });
-      const now = round5(toMin(c.now) + (c.delayMin ?? 0));
-      const base = { ...s, tasks, done, moved: s.moved.filter((m) => !dropIds.has(m.taskId)) };
-      const prev = s.plan;
-      const plan = buildPlan(base, now, {
-        minStart: now,
-        capacityMin: c.capacityMin,
-        lighterAfter: c.lighterAfter ? toMin(c.lighterAfter) : null,
-        mustFinishTaskIds: c.mustFinishTaskIds,
-        durationOverrides: overrides,
-      }, tasks);
-      const was = diffStarts(prev, plan);
-      const replan: Replan = { at: c.now, said: a.said, was, doneIds: done, lines: changeLines(plan, tasks, was, events) };
-      return {
-        ...base, plan, replan, entrance: false, expanded: null, sheet: null, nextId: s.nextId + events.length, undo: snap,
-        toast: bumpToast(s, "Re-planned.", true, 8000),
-      };
+    case "replanned": {
+      const { changes } = a.view;
+      const next = fromView(a.view);
+      const replan: Replan = { at: changes.at, said: a.said, was: changes.was, doneIds: next.done, lines: changes.lines };
+      return { ...s, ...next, screen: "plan", sheet: null, expanded: null, replan, entrance: false, undo: SNAP(s), toast: bumpToast(s, "Re-planned.", true, 8000) };
     }
     case "undo": {
       if (!s.undo) return { ...s, toast: null };
@@ -264,21 +241,6 @@ export function reducer(s: FlowState, a: Action): FlowState {
     case "reset":
       return { ...initialState(), settings: s.settings, presets: s.presets };
   }
-}
-
-/** 3 to 5 plain lines on what changed, built from the planner's decisions plus the biggest moves. */
-export function changeLines(plan: Plan, tasks: Task[], was: Record<string, string>, events: Task[]): string[] {
-  const title = (id: string) => tasks.find((t) => t.id === id)?.title ?? "A task";
-  const lines: string[] = [];
-  const keep = (l: string) => { if (!lines.includes(l)) lines.push(l); };
-  events.forEach((e) => keep(`Added ${e.title.toLowerCase()} at ${e.fixedStart}`));
-  plan.decisions.forEach(keep);
-  Object.entries(was).slice(0, 3).forEach(([id, from]) => {
-    const to = plan.blocks.find((b) => b.taskId === id)?.start;
-    if (to) keep(`${title(id)} moved from ${from} to ${to}`);
-  });
-  plan.dropped.slice(0, 2).forEach((d) => keep(`${title(d.taskId)} didn't fit, so it's waiting`));
-  return lines.slice(0, 5);
 }
 
 export const decisionsShown = (p: Plan): string[] => p.decisions.slice(0, 5);

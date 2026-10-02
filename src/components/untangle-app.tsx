@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
-import { ApiError, deletePreset, getPresets, getSettings, getToday, patchTask, postDayEdit, postDayUndo, postPlan, postPreset, postUnderstand, putSettings, type PlanResponse, type UnderstandResponse } from "@/lib/api-client";
+import { ApiError, deletePreset, getPresets, getSettings, getToday, patchTask, postDayEdit, postDayUndo, postPlan, postPreset, postReplan, postUnderstand, putSettings, type PlanResponse, type UnderstandResponse } from "@/lib/api-client";
 import { APPOINTMENT_DUMP, EXAMPLE_DUMP } from "@/fixtures/example";
-import { interpretReplan } from "@/fixtures/replan";
 import { browserTimezone, nowMinutes } from "@/lib/clock";
 import { resolveMoveTarget } from "@/lib/day-edit";
 import type { DayEditBody } from "@/lib/api-schemas";
+import type { ReplanView } from "@/lib/day-response";
 import { fmtMoveDate, initialState, reducer } from "@/lib/flow";
 import { countThings } from "@/lib/guess";
 import type { Preset } from "@/lib/guess";
@@ -238,6 +238,36 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
       .catch(() => dispatch({ type: "toast", text: "I couldn't undo that. Your plan is as it is now." }))
       .finally(() => { busy.current = false; });
   };
+  // Re-plan from the user's own words. The thinking screen plays while the server reads them and rebuilds the day; the plan stays as it is until it is back.
+  const replanRun = useRef(0);
+  const replanned = useRef<ReplanView | null>(null);
+  const replanSaid = useRef("");
+  const [replanReady, setReplanReady] = useState(false);
+  const startReplan = (text: string) => {
+    if (!s.dayId || busy.current) return;
+    const run = ++replanRun.current;
+    busy.current = true;
+    replanned.current = null;
+    replanSaid.current = text;
+    setReplanReady(false);
+    dispatch({ type: "think", kind: "replan" });
+    postReplan(s.dayId, text)
+      .then((view) => {
+        if (run !== replanRun.current) return;
+        replanned.current = view;
+        setReplanReady(true);
+      })
+      .catch((e) => {
+        if (run !== replanRun.current) return;
+        dispatch({ type: "screen", screen: "plan" });
+        dispatch({ type: "toast", text: e instanceof ApiError && e.status === 429 ? "That's today's limit for re-planning. Your plan is unchanged." : "I couldn't rebuild that. Your plan is unchanged." });
+      })
+      .finally(() => { if (run === replanRun.current) busy.current = false; });
+  };
+  const finishReplanThinking = useCallback(() => {
+    const view = replanned.current;
+    if (view) dispatch({ type: "replanned", view, said: replanSaid.current });
+  }, []);
   const toggleDone = (taskId: string) => {
     const finishing = !s.done.includes(taskId);
     dispatch({ type: "toggleDone", taskId });
@@ -276,8 +306,10 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
     );
   } else if (s.screen === "thinking") {
     const preview = s.thinking === "dump" ? [] : s.tasks;
-    const { title, steps } = thinkingSteps(s.thinking, preview, countThings(s.text), s.mode, s.settings);
-    screen = <ThinkingScreen key={s.thinking} title={title} steps={steps} ready={s.thinking === "dump" ? understandReady : planReady} onDone={s.thinking === "dump" ? finishDumpThinking : finishPlanThinking} />;
+    const { title, steps } = thinkingSteps(s.thinking, preview, countThings(s.text), s.mode, s.settings, toHHMM(now()));
+    const ready = s.thinking === "dump" ? understandReady : s.thinking === "plan" ? planReady : replanReady;
+    const onDone = s.thinking === "dump" ? finishDumpThinking : s.thinking === "plan" ? finishPlanThinking : finishReplanThinking;
+    screen = <ThinkingScreen key={s.thinking} title={title} steps={steps} ready={ready} onDone={onDone} />;
   } else if (s.screen === "understand") {
     screen = (
       <UnderstandScreen
@@ -337,11 +369,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
       {s.sheet?.type === "replan" && (
         <ReplanSheet
           nowMin={now()} openTasks={openTasks} startWithMic={micOnOpen} onClose={closeSheet}
-          onSubmit={(text) => {
-            const constraints = interpretReplan(text, openTasks, now());
-            if (!constraints) { closeSheet(); dispatch({ type: "toast", text: "I couldn't rebuild that. Your plan is unchanged." }); return; }
-            dispatch({ type: "applyReplan", constraints: { ...constraints, now: toHHMM(now()) }, said: text, now: now() });
-          }}
+          onSubmit={(text) => { closeSheet(); startReplan(text); }}
         />
       )}
       {s.sheet?.type === "newdump" && <NewDumpSheet onClose={closeSheet} onConfirm={() => dispatch({ type: "reset" })} />}

@@ -1,8 +1,10 @@
 import { test as base, expect } from "@playwright/test";
 import { fixtureTasksFor } from "../src/fixtures/example";
-import { planDay } from "../src/lib/planner";
+import { diffStarts, planDay } from "../src/lib/planner";
+import { changeLines, planReplanChanges } from "../src/lib/replan";
+import { toHHMM, toMin } from "../src/lib/time";
 import { activeTasks, keptBlocksFor, resolveMoveTarget, type DayRow } from "../src/lib/day-edit";
-import { DEFAULT_SETTINGS, type Plan, type Task } from "../src/lib/schemas";
+import { DEFAULT_SETTINGS, type Plan, type ReplanConstraints, type Task } from "../src/lib/schemas";
 import { deriveQuestions, tasksFromText } from "../src/lib/guess";
 import { createUser, deleteCreatedUsers, signInAs, type TestUser } from "./support";
 
@@ -51,6 +53,28 @@ export const test = base.extend<{ user: TestUser; understandStub: void }>({
         if (op.type === "bringBack") rows = rows.map((r) => (r.id === op.taskId ? { ...r, status: "open", movedTo: null } : r));
         replan();
         await route.fulfill({ json: view() });
+      });
+      // The real route reads the sentence with the model; the stub reads a few known phrases, then runs the same pure rules and planDay().
+      await page.route("**/api/replan", async (route) => {
+        const { instruction } = route.request().postDataJSON() as { instruction: string };
+        const t = instruction.toLowerCase();
+        const c: ReplanConstraints = { now: "11:45", doneTaskIds: [], unfinished: [], newEvents: [], capacityMin: null, lighterAfter: null, mustFinishTaskIds: [], dropTaskIds: [], delayMin: null };
+        if (t.includes("didn't finish sql")) c.unfinished.push({ taskId: "sql", remainingMin: null });
+        if (t.includes("meeting at 2")) c.newEvents.push({ title: "Meeting", start: "14:00", durationMin: 60, location: "work" });
+        if (t.includes("lighter")) c.lighterAfter = "12:00";
+        if (t.includes("must finish the app")) c.mustFinishTaskIds.push("app");
+        if (!c.unfinished.length && !c.newEvents.length && !c.lighterAfter && !c.mustFinishTaskIds.length) return route.fulfill({ status: 502, json: { error: "replan_failed" } });
+        const previous = plans.at(-1)!;
+        const changes = planReplanChanges(c, rows, previous, toMin("11:45"));
+        rows = rows.map((r) => (changes.reopen.includes(r.id) ? { ...r, status: "open" } : r));
+        const added: Task[] = changes.newEvents.map((e, i) => ({ ...e, id: `ev${i + 1}` }));
+        rows = [...rows, ...added.map((a): DayRow => ({ ...a, status: "open", movedTo: null }))];
+        const kept = keptBlocksFor(previous, rows);
+        const plan = planDay(activeTasks(rows), DEFAULT_SETTINGS, { mode, minStart: changes.minStart, fixedBlocks: kept, ...changes.limits });
+        plans.push(plan);
+        const was = diffStarts(previous, plan);
+        const lines = changeLines(previous, plan, new Map(rows.map((r) => [r.id, r.title])), was, changes.limits, added.map((a) => a.id), []);
+        await route.fulfill({ json: { ...view(), changes: { at: toHHMM(changes.minStart), was, lines: lines.length ? lines : ["Rebuilt the rest of your day"] } } });
       });
       await page.route("**/api/day/undo", async (route) => {
         const body = route.request().postDataJSON() as { version: number; tasks: DayRow[] };

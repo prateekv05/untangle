@@ -45,7 +45,7 @@ export function ReplanSheet({ nowMin, openTasks, startWithMic, onSubmit, onClose
 
   if (picker) {
     return (
-      <Sheet title={picker === "task" ? "Which one?" : "How late?"} voice={picker === "task" ? "Pick the one you didn't finish." : "Tell me how far behind you are."} onClose={() => { setPicker(null); setPending(null); }}>
+      <Sheet title={picker === "task" ? "Which one?" : "How late?"} voice={picker === "task" ? (pending?.voice ?? "Pick one.") : "Tell me how far behind you are."} onClose={() => { setPicker(null); setPending(null); }}>
         {picker === "task"
           ? (openTasks.length ? openTasks.map((t) => <SheetOption key={t.id} onClick={() => pick(t.title)}>{t.title}</SheetOption>) : <p className="voice m-0 text-ink-muted">Everything is finished.</p>)
           : DELAY_OPTIONS.map((d) => <SheetOption key={d} onClick={() => pick(d)}>{d}</SheetOption>)}

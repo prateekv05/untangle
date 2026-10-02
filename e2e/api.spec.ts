@@ -26,6 +26,7 @@ const ROUTES: Route[] = [
   { method: "POST", path: "/api/plan", body: { dayId: UUID, mode: "dayoff", tasks: [PLAN_TASK] } },
   { method: "POST", path: "/api/day/edit", body: { dayId: UUID, op: { type: "delete", taskId: UUID } } },
   { method: "POST", path: "/api/day/undo", body: { dayId: UUID, version: 1, tasks: [] } },
+  { method: "POST", path: "/api/replan", body: { dayId: UUID, instruction: "running late" } },
 ];
 
 const as = async (u: TestUser) => ({ headers: { cookie: `authjs.session-token=${await sessionCookieValue(u)}` } });
@@ -63,6 +64,10 @@ test.describe("malformed input is 400, never 500", () => {
     { method: "POST", path: "/api/day/edit", body: { dayId: UUID, op: { type: "move", taskId: UUID, to: "tomorrow" } } },
     { method: "POST", path: "/api/day/edit", body: { dayId: "nope", op: { type: "delete", taskId: UUID } } },
     { method: "POST", path: "/api/day/undo", body: { dayId: UUID, version: 0, tasks: [] } },
+    { method: "POST", path: "/api/replan", body: { dayId: UUID, instruction: "   " } },
+    { method: "POST", path: "/api/replan", body: { dayId: UUID, instruction: "x".repeat(4001) } },
+    { method: "POST", path: "/api/replan", body: { dayId: "nope", instruction: "late" } },
+    { method: "POST", path: "/api/replan", body: { dayId: UUID, instruction: "late", extra: 1 } },
     { method: "POST", path: "/api/understand", body: { text: "   " } },
     { method: "POST", path: "/api/understand", body: { text: "x".repeat(4001) } },
     { method: "POST", path: "/api/understand", body: { text: "gym", extra: 1 } },
@@ -159,4 +164,7 @@ test("edit and undo only reach the owner's day, and refuse changes that make no 
   // an owner's change that makes no sense is a 400, before any AI call
   expect((await request.post("/api/day/edit", { headers: ha, data: { dayId: day.id, op: { type: "bringBack", taskId: tasks[0].id } } })).status()).toBe(400);
   expect((await request.post("/api/day/undo", { headers: ha, data: { dayId: day.id, version: 1, tasks: [] } })).status()).toBe(404); // no plan version 1 yet
+  // re-plan: another user's day and a day with no plan yet are both 404, before any AI call
+  expect((await request.post("/api/replan", { headers: hb, data: { dayId: day.id, instruction: "I'm running late" } })).status()).toBe(404);
+  expect((await request.post("/api/replan", { headers: ha, data: { dayId: day.id, instruction: "I'm running late" } })).status()).toBe(404);
 });

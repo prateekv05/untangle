@@ -152,18 +152,24 @@ Built: `POST /api/day/edit` (edit, delete, add, move, bring back; re-plans unfin
 Checked: 96 unit tests, DB integration (restore round trip, user scoping), e2e 60 with the stubbed routes, and the real-model e2e (finished block unchanged, version 2, undo gives a plan equal to version 1). Not done: the free-text re-plan sheet still uses fixtures (Phase 7); Undo is lost on reload; a day that was understood but never planned shows the Dump screen on reopen.
 ```
 
-## [ ] Phase 7: re-plan (the centerpiece)
+## [~] Phase 7: re-plan (the centerpiece)
 
 ```
 Phase 7. Re-plan is the product. Make it great.
 
-1. [ ] src/lib/ai/replan.ts: interpret (prompts/replan.md → ReplanConstraints) then re-plan per docs/AI_CONTRACT.md section "3b": compute minStart, kept blocks, durationOverrides, newEvents → tasks of kind "fixed", capacity, lighterAfter, mustFinish, drops. Then run the same plan pipeline (validate with keptTaskIds and durationOverrides, repair, fallback to planDay with the same options).
-2. [ ] POST /api/replan: { dayId, instruction } → { plan, changes } where changes.was comes from diffStarts(previousPlan, newPlan). Save as a new plan version with trigger "replan" and the instruction.
-3. [ ] UI: dock button opens the Re-plan sheet; live clock line; text box; quick chips fill the box with sentences (chips that need a target open a picker of today's open tasks; "Running late" offers 30 min / 1 h / 90 min / 2 h). Submit → thinking ("Rebuilding the rest of your day") → Replanned state: "Re-planned at HH:MM", user's words, "Here is what I changed" card, Now marker, was-pills, collapsed done row, 8-second Undo toast.
-4. [ ] Announce results with aria-live. On failure: toast "I couldn't rebuild that. Your plan is unchanged."
-5. [ ] Evals: add all `replan` cases to scripts/eval.ts.
+1. [x] src/lib/ai/replan.ts: interpret (prompts/replan.md → ReplanConstraints) then re-plan per docs/AI_CONTRACT.md section "3b": compute minStart, kept blocks, durationOverrides, newEvents → tasks of kind "fixed", capacity, lighterAfter, mustFinish, drops. Then run the same plan pipeline (validate with keptTaskIds and durationOverrides, repair, fallback to planDay with the same options).
+2. [x] POST /api/replan: { dayId, instruction } → { plan, changes } where changes.was comes from diffStarts(previousPlan, newPlan). Save as a new plan version with trigger "replan" and the instruction.
+3. [x] UI: dock button opens the Re-plan sheet; live clock line; text box; quick chips fill the box with sentences (chips that need a target open a picker of today's open tasks; "Running late" offers 30 min / 1 h / 90 min / 2 h). Submit → thinking ("Rebuilding the rest of your day") → Replanned state: "Re-planned at HH:MM", user's words, "Here is what I changed" card, Now marker, was-pills, collapsed done row, 8-second Undo toast.
+4. [x] Announce results with aria-live. On failure: toast "I couldn't rebuild that. Your plan is unchanged."
+5. [x] Evals: add all `replan` cases to scripts/eval.ts.
 
-[ ] Acceptance: "I didn't finish SQL and I have a meeting at 2" at 11:45 yields a valid plan: finished tasks unchanged, meeting at 14:00, SQL still protected, outing intact, nothing new before 11:45, was-pills present. "Only 3 hours" respects 180 min and drops the lowest priority. "Lighter afternoon" keeps afternoon load ≤ 100 min. "Finish the app today" is never dropped. Re-plan p50 under 6 s. All replan evals pass at ≥ 95% over 3 runs.
+[~] Acceptance (quality met, latency not): "I didn't finish SQL and I have a meeting at 2" at 11:45 yields a valid plan: finished tasks unchanged, meeting at 14:00, SQL still protected, outing intact, nothing new before 11:45, was-pills present. "Only 3 hours" respects 180 min and drops the lowest priority. "Lighter afternoon" keeps afternoon load ≤ 100 min. "Finish the app today" is never dropped. Re-plan p50 under 6 s. All replan evals pass at ≥ 95% over 3 runs.
+
+Built: `src/lib/replan.ts` (pure: checks the model's ids and numbers, minStart, durationOverrides, change lines), limits threaded through `PlanInput`, `validatePlan` (capacity, lighterAfter, must-finish, no dropping a commitment whose time has not passed) and the `planDay` fallback, `src/lib/ai/replan.ts` (interpret on the fast model), `POST /api/replan` (saves version with trigger `replan` and the instruction; new events become `fixed` tasks, dropped tasks move to tomorrow; an unreadable sentence returns 502 and saves nothing), the sheet now calls it with the "Rebuilding the rest of your day" thinking screen, change card, was-pills and 8 s Undo (reuses `/api/day/undo`). The fixture interpreter and the client-side re-plan reducer are gone. `npm run eval -- --type=replan` runs the six cases.
+Measured (6 replan cases x 3 runs, interpret on Haiku 4.5, plan on gpt-6-luna): pass 94.4% to 100% over runs (one failure each in two of four runs: a "Meeting" overlapping a block the user had finished early, and an LLM drop that the new validator rule now rejects), fallback 0% to 5.6%, re-plan p50 10.6 to 11.8 s, p95 about 22 s (interpret is 1.2 to 2.5 s; the plan call is the rest). Haiku as plan model: 55% fallback, rejected. 9 pipeline cases still 100%.
+Not met: re-plan p50 under 6 s. The plan call's reasoning time dominates (same cause as Phase 5). Needs a decision: a faster plan model, a shorter re-plan prompt, or using `planDay` directly for pure-arithmetic sentences (capacity, lighter, late).
+Still faked or open: the mic in the re-plan sheet types a canned sentence (Phase 8); Undo is lost on reload; a finished block that sits in the future can overlap a new fixed event the user adds (kept blocks never move).
+Checked: 110 unit tests, e2e 82 with stubbed routes (re-plan stub runs the same pure rules and planDay), real-model e2e for re-plan, screenshot at 390 px.
 ```
 
 ## [ ] Phase 8: voice

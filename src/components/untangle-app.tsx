@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
-import { ApiError, deletePreset, getPresets, getSettings, getToday, patchTask, postDayEdit, postDayUndo, postPlan, postPreset, postReplan, postUnderstand, putSettings, type PlanResponse, type UnderstandResponse } from "@/lib/api-client";
+import { ApiError, deletePreset, getDraft, getPresets, getSettings, getToday, patchTask, postDayEdit, postDayUndo, postPlan, postPreset, postReplan, postUnderstand, putSettings, type PlanResponse, type UnderstandResponse } from "@/lib/api-client";
 import { APPOINTMENT_DUMP, EXAMPLE_DUMP } from "@/fixtures/example";
 import { browserTimezone, nowMinutes } from "@/lib/clock";
 import { resolveMoveTarget } from "@/lib/day-edit";
+import { draftFrom, type DraftPayload } from "@/lib/draft";
 import type { DayEditBody } from "@/lib/api-schemas";
 import type { ReplanView } from "@/lib/day-response";
 import { fmtMoveDate, initialState, reducer } from "@/lib/flow";
@@ -13,6 +14,7 @@ import type { Preset } from "@/lib/guess";
 import type { Question, Task } from "@/lib/schemas";
 import { localClock } from "@/lib/timezone";
 import { toHHMM } from "@/lib/time";
+import { useDraftSave } from "@/lib/use-draft-save";
 import { useOnline } from "@/lib/use-online";
 import type { Where } from "@/lib/where";
 import { DumpScreen } from "./screens/dump-screen";
@@ -63,8 +65,21 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   const [booted, setBooted] = useState(false);
   const [carriedTitles, setCarriedTitles] = useState<string[]>([]);
   const carried = carriedTitles.filter((c) => !taken.includes(c));
+  // The unfinished list is saved to the account as it changes. A draft found on open waits behind a Continue card; nothing overwrites it until the user types or starts fresh.
+  const [pendingDraft, setPendingDraft] = useState<DraftPayload | null>(null);
+  const [understandDayId, setUnderstandDayId] = useState<string | null>(null);
+  const draftPayload = useMemo(
+    () => draftFrom({ screen: s.screen, text: s.text, mode: s.mode, tasks: s.tasks, questions: s.questions, groupings: s.groupings }, understandDayId),
+    [s.screen, s.text, s.mode, s.tasks, s.questions, s.groupings, understandDayId],
+  );
+  const draftSave = useDraftSave(draftPayload, booted && !(pendingDraft && s.text === ""));
+  const { markExisting } = draftSave;
+  if (pendingDraft && s.text !== "") setPendingDraft(null); // typing replaces the saved draft, so the offer is gone for good
   useEffect(() => {
     let live = true;
+    const draftLoad = getDraft()
+      .then((d) => { if (live && d) { setPendingDraft(d); markExisting(); } })
+      .catch(() => {}); // no draft to offer: the Dump screen is the right place to start
     getToday()
       .then((res) => {
         if (!live) return;
@@ -77,9 +92,9 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         }
       })
       .catch(() => {}) // no saved day to show: the Dump screen is the right place to start
-      .finally(() => { if (live) setBooted(true); });
+      .finally(() => { void draftLoad.then(() => { if (live) setBooted(true); }); });
     return () => { live = false; };
-  }, []);
+  }, [markExisting]);
 
   // Settings and presets belong to the account: load them, then save changes optimistically and roll back on failure.
   const [attempt, setAttempt] = useState(0);
@@ -165,9 +180,20 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
     if (countThings(s.text) < 1) return;
     startUnderstand(s.text);
   };
+  const continueDraft = () => {
+    if (!pendingDraft) return;
+    setUnderstandDayId(pendingDraft.dayId);
+    dispatch({ type: "restoreDraft", draft: pendingDraft });
+    setPendingDraft(null);
+  };
+  const saveForLater = async () => {
+    const ok = await draftSave.saveNow();
+    dispatch({ type: "toast", text: ok ? "Saved for later. It will be here when you come back." : "I couldn't save that just now. Check your connection and try again." });
+  };
   const finishDumpThinking = useCallback(() => {
     const res = understood.current;
     if (!res) return;
+    setUnderstandDayId(res.dayId);
     dispatch({ type: "understood", tasks: res.tasks, questions: res.questions, groupings: res.groupings, mode: res.mode });
   }, []);
 
@@ -194,7 +220,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   const planned = useRef<PlanResponse | null>(null);
   const [planReady, setPlanReady] = useState(false);
   const startPlan = () => {
-    const dayId = understood.current?.dayId;
+    const dayId = understandDayId;
     if (!dayId) return;
     const run = ++planRun.current;
     planned.current = null;
@@ -217,8 +243,9 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   const finishPlanThinking = useCallback(() => {
     const res = planned.current;
     if (!res) return;
-    dispatch({ type: "planned", dayId: understood.current?.dayId ?? "", version: res.version, plan: res.plan, tasks: res.tasks, mode: res.mode, plannedAt: res.plannedAt });
-  }, []);
+    draftSave.clear();
+    dispatch({ type: "planned", dayId: understandDayId ?? "", version: res.version, plan: res.plan, tasks: res.tasks, mode: res.mode, plannedAt: res.plannedAt });
+  }, [draftSave, understandDayId]);
 
   // Changes to the saved plan. Each one is saved on the server, which re-plans the unfinished tasks and answers with the new day.
   const busy = useRef(false);
@@ -328,7 +355,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         onWhere={(taskId, w: Where) => patch(taskId, { location: w })}
         onDuration={(taskId, min) => patch(taskId, min === null ? { durationSource: "estimated" } : { durationMin: min, durationSource: "user" })}
         onAdd={(task) => dispatch({ type: "addTask", task, now: now() })}
-        onBuild={startPlan}
+        onBuild={startPlan} onSaveForLater={saveForLater}
         onBack={() => dispatch({ type: "screen", screen: "dump" })}
         onSettings={openSettings} offline={offline}
       />
@@ -358,6 +385,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         onYours={() => dispatch({ type: "sheet", sheet: { type: "presets" } })}
         presets={s.presets} notice={notice?.text} onRetry={notice?.retry ? submitDump : undefined} name={name} offline={offline}
         carried={carried} onCarry={(title) => { dispatch({ type: "text", text: `${s.text.trim() ? `${s.text.trim()}\n` : ""}${title}` }); setTaken((t) => [...t, title]); }}
+        draft={pendingDraft && s.text === "" ? pendingDraft : null} onContinueDraft={continueDraft} onDiscardDraft={() => setPendingDraft(null)}
         examples={demo ? EXAMPLES : undefined} onExample={(text) => dispatch({ type: "text", text })}
       />
     );

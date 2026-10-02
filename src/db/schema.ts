@@ -4,6 +4,7 @@
  * Identity: sign-up with Google is required (Auth.js, Phase 3). Every user row is a Google account; there are no anonymous users.
  */
 import { date, index, integer, jsonb, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import type { DraftPayload } from "../lib/draft";
 import type { Plan } from "../lib/schemas";
 
 export const locationEnum = pgEnum("location", ["home", "work", "outside", "anywhere"]);
@@ -97,3 +98,10 @@ export const authAttempts = pgTable("auth_attempts", {
   windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
   count: integer("count").notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.key, t.windowStart] })]);
+
+/** The one unfinished list per user: autosaved from Dump and Understand, removed when the day is built. */
+export const drafts = pgTable("drafts", {
+  userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  payload: jsonb("payload").$type<DraftPayload>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

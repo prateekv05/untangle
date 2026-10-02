@@ -7,6 +7,7 @@ import type { Preset } from "./guess";
 import { planDay, type PlanMode, type PlanOptions } from "./planner";
 import { DEFAULT_SETTINGS, type Block, type Plan, type Question, type Settings, type Task, type UnderstandResult } from "./schemas";
 import { toTask } from "./day-edit";
+import { nextLocalId, type DraftPayload } from "./draft";
 import type { DayView, ReplanView } from "./day-response";
 import { fmtDuration, toHHMM } from "./time";
 
@@ -125,6 +126,8 @@ export type Action =
   | { type: "presetSaved"; tempId: string; preset: Preset }
   | { type: "presetDrop"; id: string }
   | { type: "presetRestore"; preset: Preset }
+  /** The unfinished list from the account, put back where the user left it (Dump or Understand). */
+  | { type: "restoreDraft"; draft: DraftPayload }
   | { type: "reset" };
 
 const SNAP = (s: FlowState): Snapshot => ({ plan: s.plan, tasks: s.tasks, moved: s.moved, done: s.done, replan: s.replan, version: s.version });
@@ -238,6 +241,10 @@ export function reducer(s: FlowState, a: Action): FlowState {
       return { ...s, presets: s.presets.filter((x) => x.id !== a.id) };
     case "presetRestore":
       return s.presets.some((x) => x.id === a.preset.id) ? s : { ...s, presets: [a.preset, ...s.presets] };
+    case "restoreDraft": {
+      const d = a.draft;
+      return { ...s, screen: d.screen, sheet: null, expanded: null, text: d.text, mode: d.mode, tasks: d.tasks, questions: d.questions, groupings: d.groupings, plan: null, done: [], moved: [], replan: null, undo: null, entrance: false, nextId: nextLocalId(d.tasks) };
+    }
     case "reset":
       return { ...initialState(), settings: s.settings, presets: s.presets };
   }

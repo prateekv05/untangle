@@ -2,6 +2,7 @@
 import type { Preset } from "./guess";
 import type { DayView, ReplanView } from "./day-response";
 import type { DayEditBody } from "./api-schemas";
+import type { DraftPayload } from "./draft";
 import type { Plan, Question, Settings, Task, UnderstandResult } from "./schemas";
 
 export class ApiError extends Error {
@@ -75,3 +76,10 @@ export const postDayUndo = (dayId: string, version: number, tasks: DayView["task
 /** Tell Untangle what changed in plain words. The server reads it, rebuilds the rest of today and answers with the new day and what changed. */
 export const postReplan = (dayId: string, instruction: string) =>
   call<ReplanView>("/api/replan", { method: "POST", body: JSON.stringify({ dayId, instruction }) });
+
+/** The unfinished list, autosaved as the user goes. */
+export const getDraft = async () => (await call<{ draft: DraftPayload | null }>("/api/draft")).draft;
+export const putDraft = (d: DraftPayload) => call<void>("/api/draft", { method: "PUT", body: JSON.stringify(d) });
+export const deleteDraft = () => call<void>("/api/draft", { method: "DELETE" });
+/** For when the page is going away: `keepalive` lets the request finish after the tab closes. */
+export const putDraftOnExit = (d: DraftPayload) => { void fetch("/api/draft", { method: "PUT", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) }).catch(() => {}); };

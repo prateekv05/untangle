@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef } from "react";
+import type { DraftPayload } from "@/lib/draft";
 import { BUILT_IN_PRESETS, countThings, type Preset } from "@/lib/guess";
 import { Button } from "../button";
 import { Chip } from "../chip";
@@ -12,9 +13,14 @@ const PLACEHOLDER = "SQL assignment, gym, groceries, call Mom, send resume to Sa
 
 export const countLabel = (n: number): string => (n === 0 ? "Nothing yet" : n === 1 ? "1 thing so far" : `${n} things so far`);
 
-export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours, presets, carried = [], onCarry, notice, onRetry, examples, onExample, name, offline }: {
+const draftSummary = (d: DraftPayload): string => {
+  const n = d.screen === "understand" ? d.tasks.length : countThings(d.text);
+  return `I kept ${n === 1 ? "1 thing" : `${n} things`} for you, right where you stopped.`;
+};
+
+export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours, presets, carried = [], onCarry, draft = null, onContinueDraft, onDiscardDraft, notice, onRetry, examples, onExample, name, offline }: {
   text: string; onText: (t: string) => void; onMic: () => void; onSubmit: () => void; onSettings: () => void; onYours: () => void;
-  presets: Preset[]; carried?: string[]; onCarry?: (title: string) => void; notice?: string | null; onRetry?: () => void;
+  presets: Preset[]; carried?: string[]; onCarry?: (title: string) => void; draft?: DraftPayload | null; onContinueDraft?: () => void; onDiscardDraft?: () => void; notice?: string | null; onRetry?: () => void;
   examples?: { label: string; text: string }[]; onExample?: (text: string) => void; name?: string | null; offline?: boolean;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
@@ -31,6 +37,16 @@ export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours,
       <main className="flex flex-1 flex-col px-5 pt-[22px]">
         <h1 id="dump-heading" className="m-0 text-4xl font-bold leading-[38px] tracking-[-0.02em]">{name ? `What's on your mind, ${name}?` : "What's on your mind?"}</h1>
         <p className="mb-[18px] mt-2.5 text-ink-muted">Say it or type it, in any order. I&apos;ll untangle it.</p>
+        {draft && (
+          <section aria-label="Unfinished list" className="mb-3.5 rounded-md border border-line bg-surface p-4">
+            <p className="m-0 font-semibold">You have an unfinished list</p>
+            <p className="voice-sm mb-3 mt-1 text-ink-muted">{draftSummary(draft)}</p>
+            <div className="flex flex-wrap gap-2">
+              <Chip small selected onClick={onContinueDraft}>Continue</Chip>
+              <Chip small onClick={onDiscardDraft}>Start fresh</Chip>
+            </div>
+          </section>
+        )}
         {carried.length > 0 && (
           <section aria-label="Carried over" className="mb-3.5 rounded-md border border-line bg-surface p-4">
             <p className="m-0 mb-2 font-semibold">Carried over: {carried.join(", ")}.</p>

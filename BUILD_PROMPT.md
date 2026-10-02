@@ -136,17 +136,20 @@ Broken responses (invalid plan, throwing model) are covered by pipeline unit tes
 Deferred by decision: compare all four models on quality, latency and cost once the app is finished.
 ```
 
-## [ ] Phase 6: execute
+## [x] Phase 6: execute
 
 ```
 Phase 6. Make the day usable.
 
-1. [ ] Finish/undo, Edit (name, location, duration, fixed time → "Save and re-plan" which re-runs the plan pipeline for unfinished tasks with finished blocks kept), Delete, Move later (+ undo), Bring back, "Forgot something? Add it" on the plan (adds a task via the same understand-lite path: use the add card's fields directly, and re-plan).
-2. [ ] Carry-over card on the Dump screen for tasks moved to today.
-3. [ ] Every re-plan saves a new plan version; keep the previous so Undo can restore it.
-4. [ ] Progress and headline logic ("N of M done").
+1. [x] Finish/undo, Edit (name, location, duration, fixed time → "Save and re-plan" which re-runs the plan pipeline for unfinished tasks with finished blocks kept), Delete, Move later (+ undo), Bring back, "Forgot something? Add it" on the plan (adds a task via the same understand-lite path: use the add card's fields directly, and re-plan).
+2. [x] Carry-over card on the Dump screen for tasks moved to today.
+3. [x] Every re-plan saves a new plan version; keep the previous so Undo can restore it.
+4. [x] Progress and headline logic ("N of M done").
 
-[ ] Acceptance: finishing never moves a block; editing a duration re-plans only unfinished tasks; moved tasks appear on the target date's dump screen; undo restores the previous plan version exactly; all mutations validated and persisted.
+[x] Acceptance: finishing never moves a block; editing a duration re-plans only unfinished tasks; moved tasks appear on the target date's dump screen; undo restores the previous plan version exactly; all mutations validated and persisted.
+
+Built: `POST /api/day/edit` (edit, delete, add, move, bring back; re-plans unfinished tasks with finished blocks kept, saves the next version), `POST /api/day/undo` (saves the old snapshot again as the newest version with trigger `edit`, instruction "undo"; no migration), `GET /api/day` defaults to today in the user's timezone and the app reopens on it. Finish and unfinish use `PATCH /api/tasks/:id`.
+Checked: 96 unit tests, DB integration (restore round trip, user scoping), e2e 60 with the stubbed routes, and the real-model e2e (finished block unchanged, version 2, undo gives a plan equal to version 1). Not done: the free-text re-plan sheet still uses fixtures (Phase 7); Undo is lost on reload; a day that was understood but never planned shows the Dump screen on reopen.
 ```
 
 ## [ ] Phase 7: re-plan (the centerpiece)

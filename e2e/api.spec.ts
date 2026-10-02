@@ -24,6 +24,8 @@ const ROUTES: Route[] = [
   { method: "PATCH", path: `/api/tasks/${UUID}`, body: { title: "x" } },
   { method: "POST", path: "/api/understand", body: { text: "gym" } },
   { method: "POST", path: "/api/plan", body: { dayId: UUID, mode: "dayoff", tasks: [PLAN_TASK] } },
+  { method: "POST", path: "/api/day/edit", body: { dayId: UUID, op: { type: "delete", taskId: UUID } } },
+  { method: "POST", path: "/api/day/undo", body: { dayId: UUID, version: 1, tasks: [] } },
 ];
 
 const as = async (u: TestUser) => ({ headers: { cookie: `authjs.session-token=${await sessionCookieValue(u)}` } });
@@ -55,9 +57,12 @@ test.describe("malformed input is 400, never 500", () => {
     { method: "POST", path: "/api/presets", body: { ...PRESET, verb: "   " } },
     { method: "POST", path: "/api/presets", body: { ...PRESET, defaultDurationMin: 1 } },
     { method: "DELETE", path: "/api/presets/not-a-uuid" },
-    { method: "GET", path: "/api/day" },
     { method: "GET", path: "/api/day?date=tomorrow" },
     { method: "GET", path: "/api/day?date=2026-02-30" },
+    { method: "POST", path: "/api/day/edit", body: { dayId: UUID, op: { type: "edit", taskId: UUID, patch: {} } } },
+    { method: "POST", path: "/api/day/edit", body: { dayId: UUID, op: { type: "move", taskId: UUID, to: "tomorrow" } } },
+    { method: "POST", path: "/api/day/edit", body: { dayId: "nope", op: { type: "delete", taskId: UUID } } },
+    { method: "POST", path: "/api/day/undo", body: { dayId: UUID, version: 0, tasks: [] } },
     { method: "POST", path: "/api/understand", body: { text: "   " } },
     { method: "POST", path: "/api/understand", body: { text: "x".repeat(4001) } },
     { method: "POST", path: "/api/understand", body: { text: "gym", extra: 1 } },
@@ -139,4 +144,19 @@ test("day and task routes only reach the owner's data", async ({ request }) => {
   expect((await request.patch(`/api/tasks/${id}`, { headers: ha, data: { moveTo: "2026-10-01" } })).status()).toBe(400); // not later
   expect((await request.patch(`/api/tasks/${id}`, { headers: ha, data: { moveTo: "2026-10-02" } })).status()).toBe(200);
   expect((await (await request.get("/api/day?date=2026-10-02", { headers: ha })).json()).carried).toHaveLength(1);
+});
+
+test("edit and undo only reach the owner's day, and refuse changes that make no sense", async ({ request }) => {
+  const [a, b] = [await createUser({ onboarded: true }), await createUser({ onboarded: true })];
+  const ha = (await as(a)).headers;
+  const hb = (await as(b)).headers;
+  const { day, tasks } = await createDayWithTasks(a.id, "2026-10-01", "workday", "gym", [
+    { title: "Gym", location: "outside", kind: "health", durationMin: 60, durationSource: "user", fixedStart: null, due: "today" },
+  ], makeDb(process.env.TEST_DATABASE_URL!));
+  const op = { type: "delete", taskId: tasks[0].id };
+  expect((await request.post("/api/day/edit", { headers: hb, data: { dayId: day.id, op } })).status()).toBe(404);
+  expect((await request.post("/api/day/undo", { headers: hb, data: { dayId: day.id, version: 1, tasks: [] } })).status()).toBe(404);
+  // an owner's change that makes no sense is a 400, before any AI call
+  expect((await request.post("/api/day/edit", { headers: ha, data: { dayId: day.id, op: { type: "bringBack", taskId: tasks[0].id } } })).status()).toBe(400);
+  expect((await request.post("/api/day/undo", { headers: ha, data: { dayId: day.id, version: 1, tasks: [] } })).status()).toBe(404); // no plan version 1 yet
 });

@@ -26,4 +26,24 @@ test.describe("real model", () => {
     expect(saved.day.plan.source).toBe(body.source);
     expect(saved.day.plan.model).toBe(body.model);
   });
+
+  test("edit keeps finished blocks, saves a new version, and undo restores the old plan exactly", async ({ request, user }) => {
+    const headers = { cookie: `authjs.session-token=${await sessionCookieValue(user)}` };
+    const understood = await (await request.post("/api/understand", { headers, data: { text: DUMP } })).json();
+    const planned = await (await request.post("/api/plan", { headers, data: { dayId: understood.dayId, mode: "dayoff", tasks: understood.tasks } })).json();
+    const first = planned.plan.blocks[0];
+    expect((await request.patch(`/api/tasks/${first.taskId}`, { headers, data: { status: "done" } })).status()).toBe(200);
+    const other = planned.plan.blocks.find((b: { taskId: string }) => b.taskId !== first.taskId);
+
+    const edited = await (await request.post("/api/day/edit", { headers, data: { dayId: understood.dayId, op: { type: "edit", taskId: other.taskId, patch: { durationMin: 90, durationSource: "user" } } } })).json();
+    expect(edited.version).toBe(2);
+    expect(edited.plan.blocks.find((b: { taskId: string }) => b.taskId === first.taskId)).toEqual(first);
+    const changed = edited.plan.blocks.find((b: { taskId: string }) => b.taskId === other.taskId);
+    if (changed) expect(changed.durationMin).toBe(90);
+
+    const undone = await (await request.post("/api/day/undo", { headers, data: { dayId: understood.dayId, version: 1, tasks: planned.tasks.map((t: { id: string }) => ({ ...t, status: t.id === first.taskId ? "done" : "open", movedTo: null })) } })).json();
+    expect(undone.version).toBe(3);
+    expect(undone.plan).toEqual(planned.plan);
+    expect(undone.tasks.find((t: { id: string }) => t.id === other.taskId).durationMin).toBe(planned.tasks.find((t: { id: string }) => t.id === other.taskId).durationMin);
+  });
 });

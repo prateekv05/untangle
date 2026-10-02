@@ -1,4 +1,7 @@
 import { expect, test } from "./fixtures";
+import { planDay } from "../src/lib/planner";
+import { DEFAULT_SETTINGS } from "../src/lib/schemas";
+import { exampleTasks } from "../src/fixtures/example";
 import { openDump, setNow, toPlan, toUnderstand, EXAMPLE } from "./helpers";
 
 test("keyboard-only walkthrough from dump to re-planned", async ({ page }) => {
@@ -116,4 +119,37 @@ test("plan entrance: blocks arrive staggered, reduced motion shows the final sta
   expect(delays).toEqual(["0s", "0.18s", "0.36s"]);
   await page.getByTestId("block-sql").click();
   await expect(page.getByTestId("timeline")).not.toHaveClass(/enter/);
+});
+
+test("tasks moved to today are offered on the Dump screen and added to the list", async ({ page }) => {
+  const task = { id: "c1", title: "Buy toothpaste", location: "outside", kind: "errand", durationMin: 15, durationSource: "user", fixedStart: null, due: null };
+  await page.route("**/api/day", (route) => route.fulfill({ json: { date: "2026-10-03", day: null, carried: [task] } }));
+  await openDump(page);
+  await expect(page.getByText("Carried over: Buy toothpaste.")).toBeVisible();
+  await page.getByRole("button", { name: "Add Buy toothpaste" }).click();
+  await expect(page.getByRole("textbox", { name: "What's on your mind?" })).toHaveValue(/Buy toothpaste/);
+  await expect(page.getByText("Carried over: Buy toothpaste.")).toBeHidden();
+});
+
+test("today's saved day comes back on open, with finished and moved tasks as they were", async ({ page }) => {
+  const tasks = exampleTasks();
+  const plan = planDay(tasks, DEFAULT_SETTINGS, { mode: "dayoff" });
+  const rows = tasks.map((t) => ({ ...t, status: t.id === "mom" ? "done" : t.id === "gym" ? "moved" : "open", movedTo: t.id === "gym" ? "2026-10-04" : null }));
+  await page.route("**/api/day", (route) => route.fulfill({ json: { date: "2026-10-03", carried: [], day: { day: { id: "d1", mode: "dayoff" }, tasks: rows, plan: { version: 3, snapshot: plan, createdAt: "2026-10-03T08:30:00Z" } } } }));
+  await page.goto("/?now=08:30");
+  await expect(page.getByRole("button", { name: "Re-plan my day" }).first()).toBeVisible();
+  await expect(page.getByTestId("block-mom")).toHaveAttribute("data-done", "true");
+  await expect(page.getByText("Moved to a later day")).toBeVisible();
+  await expect(page.getByText("Oct 4")).toBeVisible();
+});
+
+test("start a new dump from the plan asks first, then opens an empty Dump screen", async ({ page }) => {
+  await toPlan(page);
+  await page.getByRole("button", { name: "Start a new dump" }).click();
+  await page.getByRole("button", { name: "Keep my plan" }).click();
+  await expect(page.getByRole("button", { name: "Re-plan my day" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Start a new dump" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Start a new dump" }).click();
+  await expect(page.getByRole("heading", { name: "What's on your mind?" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "What's on your mind?" })).toHaveValue("");
 });

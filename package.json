@@ -16,6 +16,7 @@
     "eval": "tsx scripts/eval.ts",
     "prompts": "node scripts/gen-prompts.mjs",
     "e2e": "playwright test",
+    "lighthouse": "tsx --env-file=.env.local scripts/lighthouse.ts",
     "e2e:pwa": "playwright test -c playwright.pwa.config.ts",
     "db:migrate:test": "MIGRATE_URL=\"$(grep ^TEST_DATABASE_URL= .env.local | cut -d= -f2-)\" drizzle-kit migrate",
     "test:db": "tsx --env-file=.env.local scripts/db-integration.ts"

@@ -183,7 +183,7 @@ Phase 8. Voice is the hero input. Follow docs/VOICE.md.
 4. [x] Voice on the Re-plan sheet: the mic fills the text box as words are heard; never auto-submits.
 5. [x] Text input stays first-class; voice is never required.
 
-[~] Acceptance: code paths for desktop Chrome (Web Speech) and iPhone Safari / Firefox (recorder + Whisper) are covered by e2e with Chromium's fake microphone; the real-device runs (iPhone Safari, Android Chrome) and the under-20-seconds speak-to-plan timing still need a human with a phone and a funded OPENAI_API_KEY. No audio is stored: nothing in the transcribe path touches disk, a database or browser storage (unit test in privacy.test.ts, e2e checks storage is empty).
+[~] Acceptance: code paths for desktop Chrome (Web Speech) and iPhone Safari / Firefox (recorder + Whisper) are covered by e2e with Chromium's fake microphone; the real-device runs (iPhone Safari, Android Chrome) still need a human with a phone. Speak-to-plan target relaxed by the user from 20 s to 30 s (not measured; expected 14 to 17 s typical). Real Whisper has not been called yet (needs one run with OPENAI_API_KEY). No audio is stored: nothing in the transcribe path touches disk, a database or browser storage (unit test in privacy.test.ts, e2e checks storage is empty).
 ```
 
 ## [ ] Phase 9: PWA and polish

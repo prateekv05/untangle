@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { decisionsShown, outingSummary, type Moved, type Replan } from "@/lib/flow";
+import { decisionsShown, fmtMoveDate, outingSummary, type Moved, type Replan } from "@/lib/flow";
 import type { Preset } from "@/lib/guess";
 import type { PlanMode } from "@/lib/planner";
 import type { Block, Plan, Settings, Task } from "@/lib/schemas";
@@ -36,7 +36,7 @@ export function PlanScreen(p: {
   plan: Plan; tasks: Task[]; done: string[]; moved: Moved[]; expanded: string | null; replan: Replan | null; mode: PlanMode;
   plannedAt: string; entrance: boolean; settings: Settings; presets: Preset[]; today: Date;
   onExpand: (id: string) => void; onToggleDone: (id: string) => void; onEdit: (id: string) => void; onMove: (id: string) => void;
-  onBringBack: (id: string) => void; onAdd: (t: Omit<Task, "id">) => void; onReplan: (mic: boolean) => void; onSettings: () => void;
+  onBringBack: (id: string) => void; onAdd: (t: Omit<Task, "id">) => void; onReplan: (mic: boolean) => void; onNewDump: () => void; onSettings: () => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [doneOpen, setDoneOpen] = useState(false);
@@ -142,7 +142,7 @@ export function PlanScreen(p: {
             <ul className="m-0 list-none p-0">
               {p.moved.map((m) => (
                 <li key={m.taskId} className="flex min-h-11 items-center justify-between gap-3">
-                  <span className="font-medium">{byId.get(m.taskId)?.title}<span className="text-ink-muted">, {m.to}</span></span>
+                  <span className="font-medium">{byId.get(m.taskId)?.title}<span className="text-ink-muted">, {fmtMoveDate(m.to)}</span></span>
                   <button type="button" onClick={() => p.onBringBack(m.taskId)} className="min-h-11 rounded-pill border border-line bg-surface px-4 text-sm font-semibold">Bring back</button>
                 </li>
               ))}
@@ -155,6 +155,9 @@ export function PlanScreen(p: {
           ) : (
             <button type="button" onClick={() => setAdding(true)} className="min-h-[52px] w-full rounded-md border border-dashed border-line bg-transparent text-[15px] font-medium leading-5 text-ink-muted">+ Forgot something? Add it</button>
           )}
+          <div className="mt-1 flex justify-center">
+            <button type="button" onClick={p.onNewDump} className="min-h-11 border-0 bg-transparent px-4 text-sm font-semibold text-ink-muted underline">Start a new dump</button>
+          </div>
         </div>
       </main>
       <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[430px] border-t border-line bg-surface px-5 pb-7 pt-3">

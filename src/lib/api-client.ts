@@ -1,5 +1,7 @@
 /** Browser-side calls to the account routes. Each rejects on a non-2xx so callers can roll an optimistic update back. */
 import type { Preset } from "./guess";
+import type { DayView } from "./day-response";
+import type { DayEditBody } from "./api-schemas";
 import type { Plan, Question, Settings, Task, UnderstandResult } from "./schemas";
 
 export class ApiError extends Error {
@@ -41,7 +43,7 @@ export type UnderstandResponse = {
   model: string;
 };
 export const postUnderstand = (text: string) => call<UnderstandResponse>("/api/understand", { method: "POST", body: JSON.stringify({ text }) });
-export const patchTask = (id: string, patch: Partial<Pick<Task, "location" | "durationMin" | "durationSource" | "fixedStart" | "due" | "title" | "kind">>) =>
+export const patchTask = (id: string, patch: Partial<Pick<Task, "location" | "durationMin" | "durationSource" | "fixedStart" | "due" | "title" | "kind">> & { status?: "open" | "done" }) =>
   call<Task>(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 
 export type PlanResponse = { plan: Plan; tasks: Task[]; mode: "workday" | "dayoff"; source: "llm" | "fallback"; model: string | null; version: number; plannedAt: string };
@@ -50,4 +52,22 @@ export const postPlan = (dayId: string, mode: PlanResponse["mode"], tasks: Task[
   call<PlanResponse>("/api/plan", {
     method: "POST",
     body: JSON.stringify({ dayId, mode, tasks: tasks.map(({ id, ...t }) => (/^[0-9a-f-]{36}$/.test(id) ? { id, ...t } : t)) }),
+  });
+
+export type TodayResponse = {
+  date: string;
+  day: { day: { id: string; mode: "workday" | "dayoff" }; tasks: DayView["tasks"]; plan: { version: number; snapshot: Plan; createdAt: string } | null } | null;
+  carried: Task[];
+};
+/** Today's saved day (in the account's timezone) with its latest plan, and tasks moved to today from an earlier day. */
+export const getToday = () => call<TodayResponse>("/api/day");
+
+/** One change to the saved day. The server re-plans the unfinished tasks and answers with the new day. */
+export const postDayEdit = (dayId: string, op: DayEditBody["op"]) =>
+  call<DayView>("/api/day/edit", { method: "POST", body: JSON.stringify({ dayId, op }) });
+/** Puts the tasks back as given and plan version `version` back as the newest. */
+export const postDayUndo = (dayId: string, version: number, tasks: DayView["tasks"]) =>
+  call<DayView>("/api/day/undo", {
+    method: "POST",
+    body: JSON.stringify({ dayId, version, tasks: tasks.map(({ id, title, location, kind, durationMin, durationSource, fixedStart, due, status, movedTo }) => ({ id, title, location, kind, durationMin, durationSource, fixedStart, due, status, movedTo })) }),
   });

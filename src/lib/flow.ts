@@ -6,6 +6,8 @@
 import type { Preset } from "./guess";
 import { diffStarts, planDay, type PlanMode, type PlanOptions } from "./planner";
 import { DEFAULT_SETTINGS, type Block, type Plan, type Question, type ReplanConstraints, type Settings, type Task, type UnderstandResult } from "./schemas";
+import { toTask } from "./day-edit";
+import type { DayView } from "./day-response";
 import { fmtDuration, toHHMM, toMin } from "./time";
 
 export type Screen = "dump" | "listening" | "thinking" | "understand" | "plan";
@@ -15,11 +17,13 @@ export type SheetState =
   | { type: "edit"; taskId: string }
   | { type: "move"; taskId: string }
   | { type: "replan" }
+  | { type: "newdump" }
   | { type: "settings" }
   | { type: "presets" }
   | { type: "password" };
 
 export type Grouping = UnderstandResult["groupings"][number];
+/** `to` is the ISO date the task was moved to. */
 export interface Moved { taskId: string; to: string }
 export interface Replan {
   at: string;
@@ -30,7 +34,7 @@ export interface Replan {
   lines: string[];
 }
 export interface ToastState { id: number; text: string; undo: boolean; ms: number }
-interface Snapshot { plan: Plan | null; tasks: Task[]; moved: Moved[]; done: string[]; replan: Replan | null }
+interface Snapshot { plan: Plan | null; tasks: Task[]; moved: Moved[]; done: string[]; replan: Replan | null; version: number }
 
 export interface FlowState {
   screen: Screen;
@@ -57,6 +61,9 @@ export interface FlowState {
   toast: ToastState | null;
   carried: string[];
   nextId: number;
+  /** The saved day and the plan version on screen; set once the plan is saved. */
+  dayId: string | null;
+  version: number;
 }
 
 export const initialState = (text = ""): FlowState => ({
@@ -81,6 +88,8 @@ export const initialState = (text = ""): FlowState => ({
   toast: null,
   carried: [],
   nextId: 1,
+  dayId: null,
+  version: 0,
 });
 
 export type Action =
@@ -95,11 +104,15 @@ export type Action =
   | { type: "mode"; mode: PlanMode }
   | { type: "build"; now: number }
   /** A validated plan from /api/plan: reveal it with the entrance animation. Tasks carry their saved ids. */
-  | { type: "planned"; plan: Plan; tasks: Task[]; mode: PlanMode; plannedAt: string }
+  | { type: "planned"; dayId: string; version: number; plan: Plan; tasks: Task[]; mode: PlanMode; plannedAt: string }
+  /** Today's saved day, put back on screen when the app opens. */
+  | { type: "loaded"; view: DayView }
+  /** A saved change and its re-plan from /api/day/edit: swap everything in place and offer Undo. */
+  | { type: "mutated"; view: DayView; toast: string; ms?: number }
+  /** A saved undo from /api/day/undo. */
+  | { type: "undone"; view: DayView }
   | { type: "toggleDone"; taskId: string }
   | { type: "expand"; taskId: string | null }
-  | { type: "moveLater"; taskId: string; to: string; now: number }
-  | { type: "bringBack"; taskId: string; now: number }
   | { type: "applyReplan"; constraints: ReplanConstraints; said: string; now: number }
   | { type: "undo" }
   | { type: "sheet"; sheet: SheetState }
@@ -113,7 +126,17 @@ export type Action =
   | { type: "presetRestore"; preset: Preset }
   | { type: "reset" };
 
-const SNAP = (s: FlowState): Snapshot => ({ plan: s.plan, tasks: s.tasks, moved: s.moved, done: s.done, replan: s.replan });
+const SNAP = (s: FlowState): Snapshot => ({ plan: s.plan, tasks: s.tasks, moved: s.moved, done: s.done, replan: s.replan, version: s.version });
+
+/** A saved day as screen state: tasks without their status, finished ids, and where moved tasks went. */
+function fromView(view: DayView) {
+  const tasks = view.tasks.map(toTask);
+  return {
+    dayId: view.dayId, version: view.version, plan: view.plan, tasks, mode: view.mode, plannedAt: view.plannedAt,
+    done: view.tasks.filter((t) => t.status === "done").map((t) => t.id),
+    moved: view.tasks.flatMap((t): Moved[] => (t.status === "moved" && t.movedTo ? [{ taskId: t.id, to: t.movedTo }] : [])),
+  };
+}
 const round5 = (n: number) => Math.ceil(n / 5) * 5;
 
 /** Plan the tasks that are still open. Finished blocks stay exactly where they are. */
@@ -177,20 +200,17 @@ export function reducer(s: FlowState, a: Action): FlowState {
       return { ...next, plan: buildPlan(next, a.now) };
     }
     case "planned":
-      return { ...s, screen: "plan", sheet: null, expanded: null, done: [], moved: [], replan: null, undo: null, tasks: a.tasks, mode: a.mode, plannedAt: a.plannedAt, entrance: true, plan: a.plan };
+      return { ...s, screen: "plan", sheet: null, expanded: null, done: [], moved: [], replan: null, undo: null, tasks: a.tasks, mode: a.mode, plannedAt: a.plannedAt, entrance: true, plan: a.plan, dayId: a.dayId, version: a.version };
+    case "loaded":
+      return { ...s, ...fromView(a.view), screen: "plan", sheet: null, expanded: null, replan: null, undo: null, entrance: false };
+    case "mutated":
+      return { ...s, ...fromView(a.view), sheet: null, expanded: null, replan: null, entrance: false, undo: SNAP(s), toast: bumpToast(s, a.toast, true, a.ms ?? 8000) };
+    case "undone":
+      return { ...s, ...fromView(a.view), sheet: null, expanded: null, replan: null, entrance: false, undo: null, toast: null };
     case "toggleDone":
       return { ...s, entrance: false, done: s.done.includes(a.taskId) ? s.done.filter((d) => d !== a.taskId) : [...s.done, a.taskId] };
     case "expand":
       return { ...s, expanded: s.expanded === a.taskId ? null : a.taskId, entrance: false };
-    case "moveLater": {
-      const title = s.tasks.find((t) => t.id === a.taskId)?.title ?? "Task";
-      const snap = SNAP(s);
-      const next = withPlan(s, a.now, { moved: [...s.moved, { taskId: a.taskId, to: a.to }], done: s.done.filter((d) => d !== a.taskId), expanded: null, sheet: null });
-      return { ...next, undo: snap, toast: bumpToast(s, `${title} moved to ${a.to}`, true, 5000) };
-    }
-    case "bringBack": {
-      return withPlan(s, a.now, { moved: s.moved.filter((m) => m.taskId !== a.taskId) });
-    }
     case "applyReplan": {
       const c = a.constraints;
       const snap = SNAP(s);
@@ -281,6 +301,9 @@ export const outingSummary = (blocks: Block[]): string => {
 };
 
 export const progressText = (done: number, total: number): string => `${done} of ${total} done`;
+
+/** "Oct 5" for a moved task's ISO date. */
+export const fmtMoveDate = (iso: string): string => new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 /** Tomorrow, the next two weekdays after it, then next week. */
 export const moveTargets = (today: Date): string[] => {

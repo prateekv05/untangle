@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { initialState, reducer, type FlowState } from "../flow";
+import type { DayView } from "../day-response";
 import { validatePlan } from "../validate-plan";
 import { countThings, deriveQuestions, guessTask, parseTime, splitDump, tasksFromText } from "../guess";
 import { appointmentTasks, EXAMPLE_DUMP, exampleTasks, fixtureTasksFor } from "../../fixtures/example";
@@ -38,17 +39,38 @@ test("finishing keeps the block in place and un-finishing undoes it", () => {
   assert.deepEqual(s.done, []);
 });
 
-test("move later removes the task from the plan, undo and bring back restore it", () => {
-  let s = built();
-  s = reducer(s, { type: "moveLater", taskId: "gym", to: "Tomorrow", now: toMin("08:30") });
-  assert.ok(!s.plan!.blocks.some((b) => b.taskId === "gym"));
-  assert.equal(s.toast?.text, "Gym moved to Tomorrow");
+const view = (over: Partial<DayView> = {}): DayView => {
+  const s = built();
+  return { dayId: "d1", mode: "workday", plan: s.plan!, version: 2, source: "llm", model: null, plannedAt: "09:00", tasks: s.tasks.map((t) => ({ ...t, status: "open" as const, movedTo: null })), ...over };
+};
+
+test("a saved day opens on the plan with finished and moved tasks restored", () => {
+  const v = view();
+  const tasks = v.tasks.map((t) => (t.id === "mom" ? { ...t, status: "done" as const } : t.id === "gym" ? { ...t, status: "moved" as const, movedTo: "2026-10-03" } : t));
+  const s = reducer(initialState(), { type: "loaded", view: { ...v, tasks } });
+  assert.equal(s.screen, "plan");
+  assert.deepEqual(s.done, ["mom"]);
+  assert.deepEqual(s.moved, [{ taskId: "gym", to: "2026-10-03" }]);
+  assert.equal(s.version, 2);
+  assert.equal(s.dayId, "d1");
+  assert.equal(s.entrance, false);
+  assert.ok(!("status" in s.tasks[0]));
+});
+
+test("a saved change swaps the plan in place and keeps the old state for Undo", () => {
+  const before = built();
+  const v = view({ version: 3, tasks: view().tasks.map((t) => (t.id === "gym" ? { ...t, status: "moved" as const, movedTo: "2026-10-03" } : t)) });
+  const s = reducer({ ...before, dayId: "d1", version: 2 }, { type: "mutated", view: v, toast: "Gym moved to Tomorrow", ms: 5000 });
+  assert.equal(s.version, 3);
+  assert.equal(s.moved.length, 1);
+  assert.equal(s.undo?.version, 2);
+  assert.deepEqual(s.undo?.moved, []);
+  assert.equal(s.toast?.undo, true);
   assert.equal(s.toast?.ms, 5000);
-  const undone = reducer(s, { type: "undo" });
-  assert.ok(undone.plan!.blocks.some((b) => b.taskId === "gym"));
-  assert.equal(undone.moved.length, 0);
-  const back = reducer(s, { type: "bringBack", taskId: "gym", now: toMin("08:30") });
-  assert.ok(back.plan!.blocks.some((b) => b.taskId === "gym"));
+  const back = reducer(s, { type: "undone", view: view({ version: 4 }) });
+  assert.equal(back.moved.length, 0);
+  assert.equal(back.version, 4);
+  assert.equal(back.undo, null);
 });
 
 test("editing re-plans only unfinished tasks; finished blocks stay put", () => {
@@ -153,7 +175,7 @@ test("optimistic preset edits: add replaces the same phrase, swap keeps order, d
 test("planned reveals the server's plan, tasks and mode with the entrance animation", () => {
   const before = reducer(initialState(), { type: "understood", tasks: exampleTasks(), questions: [], mode: "workday" });
   const server = built();
-  const s = reducer(before, { type: "planned", plan: server.plan!, tasks: server.tasks, mode: "dayoff", plannedAt: "09:15" });
+  const s = reducer(before, { type: "planned", dayId: "d1", version: 1, plan: server.plan!, tasks: server.tasks, mode: "dayoff", plannedAt: "09:15" });
   assert.equal(s.screen, "plan");
   assert.equal(s.plan, server.plan);
   assert.equal(s.mode, "dayoff");

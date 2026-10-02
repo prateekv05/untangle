@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
-import { ApiError, deletePreset, getPresets, getSettings, patchTask, postPlan, postPreset, postUnderstand, putSettings, type PlanResponse, type UnderstandResponse } from "@/lib/api-client";
+import { ApiError, deletePreset, getPresets, getSettings, getToday, patchTask, postDayEdit, postDayUndo, postPlan, postPreset, postUnderstand, putSettings, type PlanResponse, type UnderstandResponse } from "@/lib/api-client";
 import { APPOINTMENT_DUMP, EXAMPLE_DUMP } from "@/fixtures/example";
 import { interpretReplan } from "@/fixtures/replan";
 import { browserTimezone, nowMinutes } from "@/lib/clock";
-import { initialState, reducer } from "@/lib/flow";
+import { resolveMoveTarget } from "@/lib/day-edit";
+import type { DayEditBody } from "@/lib/api-schemas";
+import { fmtMoveDate, initialState, reducer } from "@/lib/flow";
 import { countThings } from "@/lib/guess";
 import type { Preset } from "@/lib/guess";
 import type { Question, Task } from "@/lib/schemas";
+import { localClock } from "@/lib/timezone";
 import { toHHMM } from "@/lib/time";
 import type { Where } from "@/lib/where";
 import { DumpScreen } from "./screens/dump-screen";
@@ -18,6 +21,7 @@ import { ThinkingScreen, thinkingSteps } from "./screens/thinking-screen";
 import { UnderstandScreen } from "./screens/understand-screen";
 import { EditSheet } from "./sheets/edit-sheet";
 import { MoveSheet } from "./sheets/move-sheet";
+import { NewDumpSheet } from "./sheets/new-dump-sheet";
 import { PasswordSheet } from "./sheets/password-sheet";
 import { PresetsSheet } from "./sheets/presets-sheet";
 import { ReplanSheet } from "./sheets/replan-sheet";
@@ -48,8 +52,27 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   const [hasPassword, setHasPassword] = useState(false);
   // Settings open only once the account's own values are in, so an early tap cannot save defaults over them.
   const [account, setAccount] = useState<"loading" | "ready" | "failed">("loading");
-  // Carry-over needs a backend (Phase 6); in Phase 1 it only shows with ?carry=1 so the card can be seen.
-  const carried = new URLSearchParams(search).get("carry") === "1" ? ["Gym", "Buy toothpaste"].filter((c) => !taken.includes(c)) : [];
+  // Today's saved day comes back on open; tasks moved to today from an earlier day are offered on the Dump screen.
+  const [booted, setBooted] = useState(false);
+  const [carriedTitles, setCarriedTitles] = useState<string[]>([]);
+  const carried = carriedTitles.filter((c) => !taken.includes(c));
+  useEffect(() => {
+    let live = true;
+    getToday()
+      .then((res) => {
+        if (!live) return;
+        setCarriedTitles(res.carried.map((t) => t.title));
+        const { day } = res;
+        if (day?.plan) {
+          const at = new Date(day.plan.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+          const tasks = day.tasks.map((t) => ({ ...t, movedTo: t.movedTo ?? null }));
+          dispatch({ type: "loaded", view: { dayId: day.day.id, mode: day.day.mode, tasks, plan: day.plan.snapshot, version: day.plan.version, source: "llm", model: null, plannedAt: at } });
+        }
+      })
+      .catch(() => {}) // no saved day to show: the Dump screen is the right place to start
+      .finally(() => { if (live) setBooted(true); });
+    return () => { live = false; };
+  }, []);
 
   // Settings and presets belong to the account: load them, then save changes optimistically and roll back on failure.
   const [attempt, setAttempt] = useState(0);
@@ -185,8 +208,54 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   const finishPlanThinking = useCallback(() => {
     const res = planned.current;
     if (!res) return;
-    dispatch({ type: "planned", plan: res.plan, tasks: res.tasks, mode: res.mode, plannedAt: res.plannedAt });
+    dispatch({ type: "planned", dayId: understood.current?.dayId ?? "", version: res.version, plan: res.plan, tasks: res.tasks, mode: res.mode, plannedAt: res.plannedAt });
   }, []);
+
+  // Changes to the saved plan. Each one is saved on the server, which re-plans the unfinished tasks and answers with the new day.
+  const busy = useRef(false);
+  const todayIso = () => localClock(s.settings.timezone).date;
+  const mutate = (op: DayEditBody["op"], toast: string, ms?: number) => {
+    if (!s.dayId || busy.current) return;
+    busy.current = true;
+    closeSheet();
+    dispatch({ type: "toast", text: "Re-planning the rest of your day.", ms: 30000 });
+    postDayEdit(s.dayId, op)
+      .then((view) => dispatch({ type: "mutated", view, toast, ms }))
+      .catch((e) => dispatch({ type: "toast", text: e instanceof ApiError && e.status === 429 ? "That's today's limit for re-planning. Your plan is unchanged." : "I couldn't change that. Your plan is unchanged." }))
+      .finally(() => { busy.current = false; });
+  };
+  const undoLast = () => {
+    const before = s.undo;
+    if (!s.dayId || !before || busy.current) { dispatch({ type: "toast", text: null }); return; }
+    busy.current = true;
+    const states = before.tasks.map((t) => {
+      const move = before.moved.find((m) => m.taskId === t.id);
+      return { ...t, status: move ? ("moved" as const) : before.done.includes(t.id) ? ("done" as const) : ("open" as const), movedTo: move?.to ?? null };
+    });
+    dispatch({ type: "toast", text: "Putting your plan back.", ms: 30000 });
+    postDayUndo(s.dayId, before.version, states)
+      .then((view) => dispatch({ type: "undone", view }))
+      .catch(() => dispatch({ type: "toast", text: "I couldn't undo that. Your plan is as it is now." }))
+      .finally(() => { busy.current = false; });
+  };
+  const toggleDone = (taskId: string) => {
+    const finishing = !s.done.includes(taskId);
+    dispatch({ type: "toggleDone", taskId });
+    patchTask(taskId, { status: finishing ? "done" : "open" }).catch(() => {
+      dispatch({ type: "toggleDone", taskId });
+      dispatch({ type: "toast", text: "I couldn't save that. It is back as it was." });
+    });
+  };
+  const move = (taskId: string, target: string) => {
+    const title = s.tasks.find((t) => t.id === taskId)?.title ?? "Task";
+    const to = resolveMoveTarget(target, todayIso());
+    mutate({ type: "move", taskId, to }, `${title} moved to ${/^\d/.test(target) ? fmtMoveDate(target) : target}`, 5000);
+  };
+  const saveEdit = (task: Task, p: Partial<Task>) => {
+    const changed = Object.fromEntries(Object.entries(p).filter(([k, v]) => task[k as keyof Task] !== v)) as Partial<Task>;
+    if (Object.keys(changed).length === 0) { closeSheet(); return; }
+    mutate({ type: "edit", taskId: task.id, patch: changed }, "Saved and re-planned.");
+  };
 
   const sheet = s.sheet;
   const editTask = sheet?.type === "edit" ? s.tasks.find((t) => t.id === sheet.taskId) : undefined;
@@ -194,7 +263,9 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   const openTasks = s.tasks.filter((t) => !s.done.includes(t.id) && !s.moved.some((m) => m.taskId === t.id));
 
   let screen;
-  if (s.screen === "listening") {
+  if (!booted) {
+    screen = <div className="min-h-dvh" aria-busy="true" />;
+  } else if (s.screen === "listening") {
     screen = (
       <ListeningScreen
         onClose={() => dispatch({ type: "screen", screen: "dump" })}
@@ -228,12 +299,13 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         plan={s.plan} tasks={s.tasks} done={s.done} moved={s.moved} expanded={s.expanded} replan={s.replan} mode={s.mode}
         plannedAt={s.plannedAt} entrance={s.entrance} settings={s.settings} presets={s.presets} today={today}
         onExpand={(taskId) => dispatch({ type: "expand", taskId })}
-        onToggleDone={(taskId) => dispatch({ type: "toggleDone", taskId })}
+        onToggleDone={toggleDone}
         onEdit={(taskId) => dispatch({ type: "sheet", sheet: { type: "edit", taskId } })}
         onMove={(taskId) => dispatch({ type: "sheet", sheet: { type: "move", taskId } })}
-        onBringBack={(taskId) => dispatch({ type: "bringBack", taskId, now: now() })}
-        onAdd={(task) => dispatch({ type: "addTask", task, now: now() })}
+        onBringBack={(taskId) => mutate({ type: "bringBack", taskId }, "Back in today's plan.")}
+        onAdd={(task) => mutate({ type: "add", task }, `${task.title} added and re-planned.`)}
         onReplan={(mic) => { setMicOnOpen(mic); dispatch({ type: "sheet", sheet: { type: "replan" } }); }}
+        onNewDump={() => dispatch({ type: "sheet", sheet: { type: "newdump" } })}
         onSettings={openSettings}
       />
     );
@@ -257,11 +329,11 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
       {editTask && (
         <EditSheet
           task={editTask} onClose={closeSheet}
-          onSave={(p) => { patch(editTask.id, p); closeSheet(); }}
-          onDelete={() => dispatch({ type: "removeTask", taskId: editTask.id, now: now() })}
+          onSave={(p) => saveEdit(editTask, p)}
+          onDelete={() => mutate({ type: "delete", taskId: editTask.id }, `${editTask.title} deleted.`)}
         />
       )}
-      {moveTask && <MoveSheet title={moveTask.title} today={today} onClose={closeSheet} onPick={(to) => dispatch({ type: "moveLater", taskId: moveTask.id, to, now: now() })} />}
+      {moveTask && <MoveSheet title={moveTask.title} today={today} onClose={closeSheet} onPick={(to) => move(moveTask.id, to)} />}
       {s.sheet?.type === "replan" && (
         <ReplanSheet
           nowMin={now()} openTasks={openTasks} startWithMic={micOnOpen} onClose={closeSheet}
@@ -272,12 +344,13 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
           }}
         />
       )}
+      {s.sheet?.type === "newdump" && <NewDumpSheet onClose={closeSheet} onConfirm={() => dispatch({ type: "reset" })} />}
       {s.sheet?.type === "settings" && account !== "loading" && (
         <SettingsSheet loadFailed={account === "failed"} onRetry={retryLoad} settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={saveSettings} />
       )}
       {s.sheet?.type === "password" && <PasswordSheet hasPassword={hasPassword} onClose={() => dispatch({ type: "sheet", sheet: { type: "settings" } })} onDone={(text) => { dispatch({ type: "sheet", sheet: { type: "settings" } }); dispatch({ type: "toast", text }); }} />}
       {s.sheet?.type === "presets" && <PresetsSheet presets={s.presets} onAdd={addPreset} onRemove={removePreset} onClose={closeSheet} />}
-      {s.toast && <Toast {...s.toast} onUndo={() => dispatch({ type: "undo" })} onDone={() => dispatch({ type: "toast", text: null })} />}
+      {s.toast && <Toast {...s.toast} onUndo={undoLast} onDone={() => dispatch({ type: "toast", text: null })} />}
     </div>
   );
 }

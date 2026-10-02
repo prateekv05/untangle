@@ -4,9 +4,10 @@
  */
 import { generateText, Output } from "ai";
 import { logAiCall, type AiLog } from "./log";
-import { getModel, type ModelOverride, type ModelRef } from "./models";
+import { callSettings, getModel, type ModelOverride, type ModelRef } from "./models";
 import { loadPrompt } from "./prompts";
-import { UnderstandResult, type Question, type Settings, type Task } from "../schemas";
+import { z } from "zod";
+import { Due, UnderstandResult, type Question, type Settings, type Task } from "../schemas";
 
 export type UnderstandPreset = { verb: string; location: Task["location"]; kind: Task["kind"]; defaultDurationMin: number | null };
 
@@ -31,6 +32,34 @@ export class UnderstandFailedError extends Error {
 }
 
 const MAX_QUESTIONS = 3;
+
+/**
+ * What the model is asked to produce. OpenAI's strict structured output rejects `oneOf`, which is what the
+ * discriminated Question union compiles to, so the model gets one flat question shape and we convert it back.
+ * The canonical UnderstandResult stays the single source of truth; every model sees this same wire schema.
+ */
+const WireQuestion = z.object({
+  type: z.enum(["due", "duration", "time"]),
+  taskId: z.string(),
+  prompt: z.string(),
+  /** For "due" questions: the choices. null otherwise. */
+  options: z.array(Due).nullable(),
+  /** For "duration" questions: the choices in minutes. null otherwise. */
+  optionsMin: z.array(z.number().int()).nullable(),
+});
+const WireUnderstand = UnderstandResult.extend({ questions: z.array(WireQuestion).max(3) });
+type WireUnderstand = z.infer<typeof WireUnderstand>;
+
+const DEFAULT_DUE = ["today", "tomorrow", "week", "none"] as const;
+
+export function fromWire(wire: WireUnderstand): UnderstandResult {
+  const questions: Question[] = wire.questions.map((q) => {
+    if (q.type === "due") return { type: "due", taskId: q.taskId, prompt: q.prompt, options: q.options?.length ? q.options : [...DEFAULT_DUE] };
+    if (q.type === "duration") return { type: "duration", taskId: q.taskId, prompt: q.prompt, optionsMin: q.optionsMin?.length ? q.optionsMin : [45, 60, 90] };
+    return { type: "time", taskId: q.taskId, prompt: q.prompt };
+  });
+  return UnderstandResult.parse({ ...wire, questions });
+}
 
 /** Deterministic clean-up of the model's output. Pure, so it is unit-tested. */
 export function sanitizeUnderstand(raw: UnderstandResult): UnderstandResult {
@@ -70,13 +99,13 @@ export async function understand(input: UnderstandInput, override: ModelOverride
   try {
     const { output, usage } = await generateText({
       model,
-      output: Output.object({ schema: UnderstandResult }),
+      output: Output.object({ schema: WireUnderstand }),
       system: loadPrompt("understand"),
       prompt: buildUserMessage(input),
-      temperature: 0,
+      ...callSettings(ref),
       maxOutputTokens: 4000,
     });
-    return { result: sanitizeUnderstand(output), meta: meta(ref, started, usage) };
+    return { result: sanitizeUnderstand(fromWire(output)), meta: meta(ref, started, usage) };
   } catch (e) {
     // Name only: the message can carry the user's text.
     logAiCall({ route: "understand", role: "fast", model: ref.spec, latencyMs: Date.now() - started, inputTokens: null, outputTokens: null, error: e instanceof Error ? e.name : "unknown" });

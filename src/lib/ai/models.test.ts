@@ -40,3 +40,15 @@ test("parseOverride tolerates a missing, broken or wrongly shaped cookie", () =>
   assert.deepEqual(parseOverride('{"plan":42}'), {});
   assert.deepEqual(parseOverride(serializeOverride({ plan: "openai:gpt-6.1-sol" })), { plan: "openai:gpt-6.1-sol" });
 });
+
+test("models that reject temperature get none", async () => {
+  const { callSettings } = await import("./models");
+  assert.deepEqual(callSettings(parseModelSpec("anthropic:claude-sonnet-5-5")), {});
+  assert.deepEqual(callSettings(parseModelSpec("anthropic:claude-haiku-4-5-20251001")), { temperature: 0 });
+});
+
+test("OpenAI reasoning models get no temperature either", async () => {
+  const { callSettings } = await import("./models");
+  assert.deepEqual(callSettings(parseModelSpec("openai:gpt-6.1-sol")), {});
+  assert.deepEqual(callSettings(parseModelSpec("openai:gpt-6-luna")), {});
+});

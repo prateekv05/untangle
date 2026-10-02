@@ -62,6 +62,10 @@ export function resolveModelSpec(role: Role, config: ModelConfig, override: Mode
   return parseModelSpec(config.defaults[role]);
 }
 
+/** Models that reject `temperature` (the SDK would warn on every call). Provider quirks live here, never in prompts. */
+const NO_TEMPERATURE = [/^claude-(sonnet|opus|fable)-5/, /^gpt-6/];
+export const callSettings = (ref: ModelRef): { temperature?: number } => (NO_TEMPERATURE.some((re) => re.test(ref.id)) ? {} : { temperature: 0 });
+
 export function buildModel(ref: ModelRef): LanguageModel {
   // Keys come from ANTHROPIC_API_KEY / OPENAI_API_KEY in the server environment; they never reach the client.
   return ref.provider === "anthropic" ? createAnthropic()(ref.id) : createOpenAI()(ref.id);

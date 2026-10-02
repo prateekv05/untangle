@@ -78,7 +78,7 @@ Phase 2. Persistence layer. No auth yet (Phase 3), no AI yet.
 [ ] Acceptance: the migration applies cleanly to an empty Neon branch; the integration test passes; incrementAiUsage rejects the 41st call; a test proves one user cannot read another user's day or tasks; typecheck, lint, test pass.
 ```
 
-## [ ] Phase 3: sign-up gate, onboarding and optional password
+## [x] Phase 3: sign-up gate, onboarding and optional password
 
 ```
 Phase 3. Nobody can use Untangle without signing up. Build the Google sign-up gate, onboarding, the optional password, and the account-based routes. Everything after this phase builds on real accounts. Plan first, then build.
@@ -94,7 +94,7 @@ First, tell me before writing code: (a) the Auth.js version you will install and
 7. [x] Name is shown only in the Dump greeting and the Settings account row. Gender and name are never included in any prompt or log.
 8. [x] Tests: unit tests for upsertGoogleUser, requireUser, password hashing/verify and rate limiting, the /api/me schema and the redirect rule; route tests that every route returns 401 without a session and 400 with malformed input; Playwright: signed out sees only Welcome, a new account goes through onboarding once into Dump, a returning sign-in goes straight to Dump with saved data, sign-in mocked at the Auth.js boundary.
 
-[ ] Acceptance: a signed-out visitor sees only the Welcome screen and every API route returns 401; a new Google account is routed through onboarding exactly once; signing in with Google (or password, if set) in a second browser shows exactly the same days, tasks, plans, presets and settings; setting, changing and removing a password works and Google sign-in still works afterwards; sign-out returns to Welcome; refresh keeps state; routes reject malformed input with 400 and typed errors and never leak stack traces; password hashes never leave the server; Google failure shows the quiet error and lets me retry; no secrets in the client bundle; no gender or name in logs or prompts (grep); axe has no serious issues; typecheck, lint, test pass; screenshots at 390 px in both themes.
+[x] Acceptance: a signed-out visitor sees only the Welcome screen and every API route returns 401; a new Google account is routed through onboarding exactly once; signing in with Google (or password, if set) in a second browser shows exactly the same days, tasks, plans, presets and settings; setting, changing and removing a password works and Google sign-in still works afterwards; sign-out returns to Welcome; refresh keeps state; routes reject malformed input with 400 and typed errors and never leak stack traces; password hashes never leave the server; Google failure shows the quiet error and lets me retry; no secrets in the client bundle; no gender or name in logs or prompts (grep); axe has no serious issues; typecheck, lint, test pass; screenshots at 390 px in both themes.
 ```
 
 ## [ ] Phase 4: understand

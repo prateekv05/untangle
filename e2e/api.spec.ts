@@ -27,6 +27,7 @@ const ROUTES: Route[] = [
   { method: "POST", path: "/api/day/edit", body: { dayId: UUID, op: { type: "delete", taskId: UUID } } },
   { method: "POST", path: "/api/day/undo", body: { dayId: UUID, version: 1, tasks: [] } },
   { method: "POST", path: "/api/replan", body: { dayId: UUID, instruction: "running late" } },
+  { method: "POST", path: "/api/transcribe" },
 ];
 
 const as = async (u: TestUser) => ({ headers: { cookie: `authjs.session-token=${await sessionCookieValue(u)}` } });
@@ -95,6 +96,21 @@ test.describe("malformed input is 400, never 500", () => {
     const res = await request.put("/api/settings", { headers: { ...(await as(user)).headers, "content-type": "application/json" }, data: "{nope" });
     expect(res.status()).toBe(400);
   });
+});
+
+test("transcribe refuses what it should before any provider call", async ({ request }) => {
+  const user = await createUser({ onboarded: true });
+  const { headers } = await as(user);
+  const post = (multipart: Record<string, string | number | boolean | { name: string; mimeType: string; buffer: Buffer }>) =>
+    request.post("/api/transcribe", { headers, multipart });
+  const audio = (buffer: Buffer, mimeType = "audio/webm") => ({ name: "dump.webm", mimeType, buffer });
+
+  expect((await request.post("/api/transcribe", { headers, data: { text: "x" } })).status()).toBe(400);
+  expect((await post({ seconds: "3" })).status()).toBe(400);
+  expect((await post({ audio: audio(Buffer.alloc(0)) })).status()).toBe(400);
+  expect((await post({ audio: audio(Buffer.from("x"), "text/html") })).status()).toBe(400);
+  expect((await post({ audio: audio(Buffer.from("x")), seconds: "500" })).status()).toBe(400);
+  expect((await post({ audio: audio(Buffer.alloc(5 * 1024 * 1024 + 1)) })).status()).toBe(413);
 });
 
 test("planning a day that is not yours or does not exist is 404", async ({ request }) => {

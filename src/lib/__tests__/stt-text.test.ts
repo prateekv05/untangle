@@ -32,3 +32,16 @@ test("mime: webm first, mp4 on Safari, null when nothing is known", () => {
   assert.equal(audioFileName("audio/mp4"), "dump.m4a");
   assert.equal(audioFileName("audio/webm;codecs=opus"), "dump.webm");
 });
+
+import { audioProblem } from "../stt/text";
+
+test("audio checks: empty, too large, wrong type, too long", () => {
+  const ok = { size: 1000, type: "audio/webm" };
+  assert.equal(audioProblem(ok, 30, 120), null);
+  assert.equal(audioProblem(ok, null, 120), null);
+  assert.equal(audioProblem({ ...ok, size: 0 }, 3, 120), "empty");
+  assert.equal(audioProblem({ ...ok, size: 5 * 1024 * 1024 + 1 }, 3, 120), "too_large");
+  assert.equal(audioProblem({ ...ok, type: "text/html" }, 3, 120), "bad_type");
+  assert.equal(audioProblem(ok, 126, 120), "too_long");
+  assert.equal(audioProblem(ok, 124, 120), null);
+});

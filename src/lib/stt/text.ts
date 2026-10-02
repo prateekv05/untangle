@@ -57,3 +57,12 @@ export function audioFileName(mime: string): string {
 }
 
 export const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
+
+/** What /api/transcribe accepts. Returns the reason it refuses, or null. `seconds` is what the client's timer says. */
+export function audioProblem(file: { size: number; type: string }, seconds: number | null, maxSeconds: number): "empty" | "too_large" | "too_long" | "bad_type" | null {
+  if (file.size < 1) return "empty";
+  if (file.size > MAX_AUDIO_BYTES) return "too_large";
+  if (!/^audio\/|^video\/(webm|mp4)$/.test(file.type)) return "bad_type";
+  if (seconds !== null && seconds > maxSeconds + 5) return "too_long";
+  return null;
+}

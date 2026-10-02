@@ -20,6 +20,7 @@ const ROUTES: Route[] = [
   { method: "DELETE", path: `/api/presets/${UUID}` },
   { method: "GET", path: "/api/day?date=2026-10-01" },
   { method: "PATCH", path: `/api/tasks/${UUID}`, body: { title: "x" } },
+  { method: "POST", path: "/api/understand", body: { text: "gym" } },
 ];
 
 const as = async (u: TestUser) => ({ headers: { cookie: `authjs.session-token=${await sessionCookieValue(u)}` } });
@@ -54,6 +55,9 @@ test.describe("malformed input is 400, never 500", () => {
     { method: "GET", path: "/api/day" },
     { method: "GET", path: "/api/day?date=tomorrow" },
     { method: "GET", path: "/api/day?date=2026-02-30" },
+    { method: "POST", path: "/api/understand", body: { text: "   " } },
+    { method: "POST", path: "/api/understand", body: { text: "x".repeat(4001) } },
+    { method: "POST", path: "/api/understand", body: { text: "gym", extra: 1 } },
     { method: "PATCH", path: "/api/tasks/not-a-uuid", body: { title: "x" } },
     { method: "PATCH", path: `/api/tasks/${UUID}`, body: {} },
     { method: "PATCH", path: `/api/tasks/${UUID}`, body: { durationMin: -5 } },
@@ -61,7 +65,7 @@ test.describe("malformed input is 400, never 500", () => {
     { method: "PATCH", path: `/api/tasks/${UUID}`, body: { moveTo: "2026-10-02", title: "x" } },
   ];
   for (const r of BAD) {
-    test(`${r.method} ${r.path} ${JSON.stringify(r.body ?? "")}`, async ({ request }) => {
+    test(`${r.method} ${r.path} ${JSON.stringify(r.body ?? "").slice(0, 80)}`, async ({ request }) => {
       const user = await createUser({ onboarded: true });
       const res = await send(request, r, (await as(user)).headers);
       expect(res.status()).toBe(400);

@@ -172,18 +172,18 @@ Still faked or open: the mic in the re-plan sheet types a canned sentence (Phase
 Checked: 110 unit tests, e2e 82 with stubbed routes (re-plan stub runs the same pure rules and planDay), real-model e2e for re-plan, screenshot at 390 px.
 ```
 
-## [ ] Phase 8: voice
+## [~] Phase 8: voice
 
 ```
 Phase 8. Voice is the hero input. Follow docs/VOICE.md.
 
-1. [ ] src/lib/stt/types.ts (Transcriber), WebSpeechTranscriber (feature detected), ServerTranscriber (MediaRecorder, mime fallback for Safari) and POST /api/transcribe (≤ 120 s, ≤ 5 MB, enforces the daily limit, discards audio after transcription). Provider is OpenAI Whisper (STT_PROVIDER=openai, STT_MODEL, OPENAI_API_KEY) behind a single transcribe(blob) function.
-2. [ ] Listening screen for real: live transcript, timer, waveform driven by an AnalyserNode where available, "Planning for tomorrow, Friday" chip from the text, heard-so-far chips (debounced cheap extraction or client-side split, see VOICE.md), Done talking, close = discard, 120 s auto-stop toast.
-3. [ ] All permission and error states in docs/SCREENS.md and docs/VOICE.md.
-4. [ ] Voice on the Re-plan sheet: the mic fills the text box; never auto-submit.
-5. [ ] Keep text input first-class everywhere; voice must never be required.
+1. [x] src/lib/stt/types.ts (Transcriber), WebSpeechTranscriber (feature detected, Safari excluded), ServerTranscriber (MediaRecorder, webm/opus then mp4) and POST /api/transcribe (<= 120 s, <= 5 MB, counts against the daily limit, audio never written anywhere). Provider is OpenAI Whisper (STT_PROVIDER=openai, STT_MODEL, OPENAI_API_KEY) behind a single transcribe(blob) function in src/lib/stt/server.ts.
+2. [x] Listening screen for real: live transcript, timer, waveform driven by an AnalyserNode, "Planning for tomorrow, Friday" chip from the text, heard-so-far chips (client-side split, display only), Done talking, close = discard, 120 s auto-stop toast.
+3. [x] Permission needed sheet, blocked, nothing heard, unsupported, failed and daily-limit states, each with a way to type instead.
+4. [x] Voice on the Re-plan sheet: the mic fills the text box as words are heard; never auto-submits.
+5. [x] Text input stays first-class; voice is never required.
 
-[ ] Acceptance: works on desktop Chrome and on an iPhone in Safari (via ServerTranscriber) and on Android Chrome; denied permission falls back gracefully; no audio is stored (verify); the whole demo path (speak → plan) completes in under 20 seconds on a normal connection.
+[~] Acceptance: code paths for desktop Chrome (Web Speech) and iPhone Safari / Firefox (recorder + Whisper) are covered by e2e with Chromium's fake microphone; the real-device runs (iPhone Safari, Android Chrome) and the under-20-seconds speak-to-plan timing still need a human with a phone and a funded OPENAI_API_KEY. No audio is stored: nothing in the transcribe path touches disk, a database or browser storage (unit test in privacy.test.ts, e2e checks storage is empty).
 ```
 
 ## [ ] Phase 9: PWA and polish

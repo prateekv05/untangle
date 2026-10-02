@@ -149,6 +149,7 @@ for (const scheme of ["light", "dark"] as const) {
     const { default: AxeBuilder } = await import("@axe-core/playwright");
     const out = process.env.SHOT_DIR ?? "test-results/screens";
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.addInitScript(() => localStorage.setItem("untangle-theme", "system")); // the app defaults to light: follow the emulated scheme instead
     const check = async (label: string) => {
       const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
       const bad = r.violations.filter((v) => v.impact === "serious" || v.impact === "critical");

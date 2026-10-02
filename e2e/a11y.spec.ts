@@ -37,6 +37,7 @@ async function axe(page: Page, label: string, opts: { sizes?: boolean } = {}) {
 for (const scheme of ["light", "dark"] as const) {
   test(`axe finds no serious issues on any screen, ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.addInitScript(() => localStorage.setItem("untangle-theme", "system")); // the app defaults to light: follow the emulated scheme instead
     await openDump(page);
     await axe(page, "dump empty");
     await page.getByRole("textbox", { name: "What's on your mind?" }).fill(EXAMPLE);
@@ -71,6 +72,7 @@ for (const scheme of ["light", "dark"] as const) {
 
   test(`axe on listening and gallery, ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.addInitScript(() => localStorage.setItem("untangle-theme", "system")); // the app defaults to light: follow the emulated scheme instead
     await fakeSpeech(page, ["Okay, tomorrow I need to finish my SQL assignment,", "I have to go grocery shopping,", "and call my mom,"]);
     await page.goto("/");
     await page.getByRole("button", { name: "Tap to talk" }).click();
@@ -106,6 +108,7 @@ test("every control shows a visible focus ring on the Dump and Plan screens", as
 test("the offline note and the install hint pass axe and the target size, both themes", async ({ page }) => {
   for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.addInitScript(() => localStorage.setItem("untangle-theme", "system")); // the app defaults to light: follow the emulated scheme instead
     await toPlan(page);
     await page.evaluate(() => {
       const e = new Event("beforeinstallprompt") as Event & { prompt: () => Promise<void>; userChoice: Promise<unknown> };

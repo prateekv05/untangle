@@ -3,7 +3,7 @@ export type Theme = "light" | "dark";
 export const THEME_KEY = "untangle-theme";
 
 // Runs before first paint (inlined in <head>), so the page never flashes the wrong theme.
-export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");if(t!=="light"&&t!=="dark"){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.setAttribute("data-theme",t)}catch(e){}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");if(t==="system"){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}else if(t!=="dark"){t="light"}document.documentElement.setAttribute("data-theme",t)}catch(e){}})();`;
 
 export function currentTheme(): Theme {
   return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
@@ -20,20 +20,21 @@ export function setTheme(theme: Theme): void {
 
 export type ThemePref = Theme | "system";
 
+/** Light unless the user chose otherwise. */
 export function themePreference(): ThemePref {
   try {
     const t = localStorage.getItem(THEME_KEY);
-    return t === "light" || t === "dark" ? t : "system";
+    return t === "dark" || t === "system" ? t : "light";
   } catch {
-    return "system";
+    return "light";
   }
 }
 
-/** "system" forgets the stored choice and follows the OS. */
+/** "system" is remembered as its own choice and follows the OS; with no choice stored the app is light. */
 export function setThemePreference(pref: ThemePref): void {
   if (pref !== "system") return setTheme(pref);
   try {
-    localStorage.removeItem(THEME_KEY);
+    localStorage.setItem(THEME_KEY, "system");
   } catch {
     // Storage can be blocked; the theme still applies for this visit.
   }

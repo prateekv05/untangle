@@ -11,6 +11,7 @@ mkdirSync(OUT, { recursive: true });
 for (const scheme of ["light", "dark"] as const) {
   test(`screenshots, ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.addInitScript(() => localStorage.setItem("untangle-theme", "system")); // the app defaults to light: follow the emulated scheme instead
     const shot = (name: string, fullPage = true) => page.screenshot({ path: `${OUT}/${name}-${scheme}.png`, fullPage });
 
     await openDump(page);
@@ -60,6 +61,7 @@ for (const scheme of ["light", "dark"] as const) {
 
   test(`listening and gallery, ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
+    await page.addInitScript(() => localStorage.setItem("untangle-theme", "system")); // the app defaults to light: follow the emulated scheme instead
     await fakeSpeech(page, ["Okay, tomorrow I need to finish my SQL assignment,", "I have to go grocery shopping,", "I need to call my mom,", "I want to go to the gym,", "I need to send Sarah my resume,", "and I really need to spend some time on my app"]);
     await page.goto("/?demo=1");
     await page.getByRole("button", { name: "Tap to talk" }).click();

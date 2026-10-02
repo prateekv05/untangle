@@ -39,3 +39,12 @@ test("task patch: needs a field, only open or done, moveTo stands alone", () => 
   assert.equal(TaskPatchBody.safeParse({ moveTo: "2026-10-02", title: "x" }).success, false);
   assert.equal(TaskPatchBody.safeParse({ id: "other" }).success, false);
 });
+
+test("understandBody trims, requires text and enforces the cap", async () => {
+  const { understandBody } = await import("../api-schemas");
+  const body = understandBody(10);
+  assert.equal(body.parse({ text: "  gym  " }).text, "gym");
+  assert.throws(() => body.parse({ text: "   " }));
+  assert.throws(() => body.parse({ text: "x".repeat(11) }));
+  assert.throws(() => body.parse({ text: "gym", extra: 1 }));
+});

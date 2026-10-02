@@ -42,3 +42,7 @@ export const TaskPatchBody = z
   .refine((v) => Object.keys(v).length > 0, "Send at least one field")
   .refine((v) => v.moveTo === undefined || Object.keys(v).length === 1, "moveTo cannot be combined with other fields");
 export type TaskPatchBody = z.infer<typeof TaskPatchBody>;
+
+
+/** POST /api/understand. The length cap comes from MAX_DUMP_CHARS, so the route builds this schema with it. */
+export const understandBody = (maxChars: number) => z.object({ text: z.string().trim().min(1).max(maxChars) }).strict();

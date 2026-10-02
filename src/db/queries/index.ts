@@ -45,6 +45,20 @@ export async function createDayWithTasks(
   return { day, tasks: rows.map(rowToTask) };
 }
 
+/** One day per user per date: a fresh dump for a date that already has a day replaces it (tasks and plans go with it). */
+export async function replaceDayWithTasks(
+  userId: string,
+  date: string,
+  mode: "workday" | "dayoff",
+  rawDump: string,
+  newTasks: NewTask[],
+  db: Db = getDb(),
+) {
+  assertIsoDate(date);
+  await db.delete(days).where(and(eq(days.userId, userId), eq(days.date, date)));
+  return createDayWithTasks(userId, date, mode, rawDump, newTasks, db);
+}
+
 /** Day, its non-deleted tasks, and the latest plan version. null when the user has no day for that date. */
 export async function getDay(userId: string, date: string, db: Db = getDb()) {
   const [day] = await db.select().from(days).where(and(eq(days.userId, userId), eq(days.date, date))).limit(1);

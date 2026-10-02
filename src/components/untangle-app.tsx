@@ -417,7 +417,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
       )}
       {s.sheet?.type === "password" && <PasswordSheet hasPassword={hasPassword} onClose={() => dispatch({ type: "sheet", sheet: { type: "settings" } })} onDone={(text) => { dispatch({ type: "sheet", sheet: { type: "settings" } }); dispatch({ type: "toast", text }); }} />}
       {s.sheet?.type === "presets" && <PresetsSheet presets={s.presets} onAdd={addPreset} onRemove={removePreset} onClose={closeSheet} />}
-      {historyOpen && <HistoryScreen onClose={() => setHistoryOpen(false)} />}
+      {historyOpen && <HistoryScreen today={localClock(s.settings.timezone).date} onClose={() => setHistoryOpen(false)} />}
       {s.toast && <Toast {...s.toast} onUndo={undoLast} onDone={() => dispatch({ type: "toast", text: null })} />}
     </div>
   );

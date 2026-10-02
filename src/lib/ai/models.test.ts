@@ -47,8 +47,9 @@ test("models that reject temperature get none", async () => {
   assert.deepEqual(callSettings(parseModelSpec("anthropic:claude-haiku-4-5-20251001")), { temperature: 0 });
 });
 
-test("OpenAI reasoning models get no temperature either", async () => {
+test("OpenAI reasoning models get no temperature and low reasoning effort", async () => {
   const { callSettings } = await import("./models");
-  assert.deepEqual(callSettings(parseModelSpec("openai:gpt-6.1-sol")), {});
-  assert.deepEqual(callSettings(parseModelSpec("openai:gpt-6-luna")), {});
+  const low = { providerOptions: { openai: { reasoningEffort: "low" } } };
+  assert.deepEqual(callSettings(parseModelSpec("openai:gpt-6.1-sol")), low);
+  assert.deepEqual(callSettings(parseModelSpec("openai:gpt-6-luna")), low);
 });

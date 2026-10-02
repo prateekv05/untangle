@@ -59,7 +59,7 @@ Scheduling rules (hard constraints; the validator enforces them):
 6. Focus (`deep`) tasks go in the biggest, freshest window, earliest due first. `due: today` before `tomorrow` before `week`.
 7. Quick tasks and calls fill small gaps; calls prefer lunch or evening.
 8. Every task is in `blocks` or `dropped`, exactly once. A dropped task has a `why` and says where it goes ("first thing tomorrow").
-9. `decisions`: up to 6 lines, each one choice with its reason, first person, plain ("Finish SQL assignment goes first because it's due tomorrow").
+9. `decisions`: up to 4 lines, each one choice with its reason, first person, plain ("Finish SQL assignment goes first because it's due tomorrow").
 10. `note`: if any `health`/`deep` task is `estimated`, "I guessed the time for X (N min). Set your own and I will re-plan." else null.
 11. `hop`: short text for outing blocks after the first: "on the way back" (when health is first), "next stop", or "right after your <appointment>". Null otherwise.
 
@@ -97,7 +97,7 @@ if errs: plan = planDay(...) ; source = "fallback"
 
 ## Reason style guide (for prompts and fallback copy)
 
-- First person, present tense, one sentence, 8 to 25 words, no jargon.
+- First person, present tense, one sentence, 6 to 16 words, no jargon (kept short to cut plan latency).
 - Say the cause: "Due tomorrow, so it gets the first long stretch you have."
 - Name the relationship: "You're already out at the gym, so this goes on the way back home. No second trip."
 - No exclamation marks, no emoji, no "optimised", no "AI".

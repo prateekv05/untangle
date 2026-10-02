@@ -123,16 +123,17 @@ Phase 5. Implement the plan call with the safety net.
 5. [x] Never reveal an unvalidated plan. If streaming, stream into a staging buffer and reveal after validation with the entrance animation. If not streaming, keep the thinking screen until done.
 6. [x] Extend scripts/eval.ts to run full pipeline cases and every plan assertion in evals/README.md.
 
-[ ] Acceptance (open: plan p50 latency, see below): `npm run eval` passes ≥ 95% for pipeline cases over 3 runs; fallback rate under 5% (report it, per model); a deliberately broken model response (inject via a test hook) is repaired or falls back and the user sees a valid plan; plan p50 latency under 6 s (report p50/p95).
+[~] Acceptance (p50 is borderline, see below): `npm run eval` passes ≥ 95% for pipeline cases over 3 runs; fallback rate under 5% (report it, per model); a deliberately broken model response (inject via a test hook) is repaired or falls back and the user sees a valid plan; plan p50 latency under 6 s (report p50/p95).
 
-Measured (9 pipeline cases x 3 runs, understand on Haiku 4.5, 27 plan calls per model):
-| plan model | pass | fallback | repaired | plan p50 / p95 |
-| claude-sonnet-5-5 | 100% | 0% | 0 | 7.8 s / 14.1 s |
-| gpt-6-luna | 100% | 0% | 0 | 7.1 s / 11.3 s |
-| claude-haiku-4-5 | 100% | 18.5% | 4 | 5.3 s / 9.8 s (concurrent run) |
-| gpt-6.1-sol | 92.6% | 0% | 0 | 13.8 s / 23.3 s (concurrent run) |
-Broken responses (invalid plan, throwing model) are covered by pipeline unit tests: repaired once or replaced by planDay().
-Open: plan p50 is above the 6 s target on every model with a low fallback rate. Haiku is fastest but falls back too often (workday rules).
+Measured (9 pipeline cases x 3 runs, understand on Haiku 4.5, 27 plan calls per model), first pass with the long prompt:
+| plan model | pass | fallback | plan p50 / p95 |
+| claude-sonnet-5-5 | 100% | 0% | 7.8 s / 14.1 s |
+| gpt-6-luna | 100% | 0% | 7.1 s / 11.3 s |
+| claude-haiku-4-5 | 100% | 18.5% | 5.3 s / 9.8 s (concurrent run) |
+| gpt-6.1-sol | 92.6% | 0% | 13.8 s / 23.3 s (concurrent run) |
+Then the plan prompt was tightened (reasons 6 to 16 words, 4 decisions) and OpenAI calls got `reasoningEffort: "low"` (the prompt change alone did not help: the time is reasoning, not visible output). Default plan model for now: `openai:gpt-6-luna`. Result: pass 100%, fallback 0%, plan p50 5.9 s and 6.7 s over two runs, p95 about 13 s. p50 sits on the 6 s line and is noisy run to run.
+Broken responses (invalid plan, throwing model) are covered by pipeline unit tests.
+Deferred by decision: compare all four models on quality, latency and cost once the app is finished.
 ```
 
 ## [ ] Phase 6: execute

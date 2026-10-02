@@ -64,7 +64,11 @@ export function resolveModelSpec(role: Role, config: ModelConfig, override: Mode
 
 /** Models that reject `temperature` (the SDK would warn on every call). Provider quirks live here, never in prompts. */
 const NO_TEMPERATURE = [/^claude-(sonnet|opus|fable)-5/, /^gpt-6/];
-export const callSettings = (ref: ModelRef): { temperature?: number } => (NO_TEMPERATURE.some((re) => re.test(ref.id)) ? {} : { temperature: 0 });
+export const callSettings = (ref: ModelRef): { temperature?: number; providerOptions?: { openai: { reasoningEffort: "low" } } } => ({
+  ...(NO_TEMPERATURE.some((re) => re.test(ref.id)) ? {} : { temperature: 0 }),
+  // OpenAI models reason before answering, which dominates latency. Both calls are extraction/constraint work, so keep it low.
+  ...(ref.provider === "openai" ? { providerOptions: { openai: { reasoningEffort: "low" as const } } } : {}),
+});
 
 export function buildModel(ref: ModelRef): LanguageModel {
   // Keys come from ANTHROPIC_API_KEY / OPENAI_API_KEY in the server environment; they never reach the client.

@@ -39,6 +39,9 @@ const EXAMPLES = [
  * Every screen as one client state machine (src/lib/flow.ts). Understanding runs on the real model (/api/understand);
  * planning still runs on fixtures until Phase 5; settings and presets are the signed-in account's own and are saved through /api.
  */
+/** What was said joins whatever was already typed in the box, within the 4,000 character cap. */
+const withHeard = (typed: string, heard: string) => `${typed.trim() ? `${typed.trim()}\n` : ""}${heard}`.slice(0, 4000);
+
 export function UntangleApp({ name = null }: { name?: string | null }) {
   const [s, dispatch] = useReducer(reducer, undefined, () => {
     const init = initialState();
@@ -299,9 +302,8 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
     screen = (
       <ListeningScreen
         onClose={() => dispatch({ type: "screen", screen: "dump" })}
-        onDone={() => startUnderstand(`${s.text.trim() ? `${s.text.trim()}\n` : ""}${EXAMPLE_DUMP}.`)}
-        onLimit={() => { startUnderstand(EXAMPLE_DUMP); dispatch({ type: "toast", text: "That's the limit. I'm working with what I heard." }); }}
-        startAt={Number(new URLSearchParams(search).get("listen") ?? 0)}
+        onDone={(heard) => startUnderstand(withHeard(s.text, heard))}
+        onLimit={(heard) => { startUnderstand(withHeard(s.text, heard)); dispatch({ type: "toast", text: "That's the limit. I'm working with what I heard." }); }}
       />
     );
   } else if (s.screen === "thinking") {

@@ -30,11 +30,3 @@ export function fixtureTasksFor(text: string): Task[] | null {
   if (norm(text) === norm(APPOINTMENT_DUMP)) return appointmentTasks();
   return null;
 }
-
-export const MOCK_TRANSCRIPT = {
-  said: "Okay, tomorrow I need to finish my SQL assignment, I have to go grocery shopping, I need to call my mom, I want to go to the gym, I need to send Sarah my resume, and ",
-  newest: "I really need to spend some time on my app",
-  planningFor: "Planning for tomorrow, Friday",
-  heard: ["SQL assignment", "Grocery shopping", "Call mom", "Gym", "Send resume to Sarah", "Work on app"],
-  full: `${EXAMPLE_DUMP}.`,
-};

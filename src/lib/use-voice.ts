@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createTranscriber } from "./stt";
 import { VoiceError, type Transcriber, type VoiceErrorCode } from "./stt/types";
 
-export type VoicePhase = "ask" | "starting" | "listening" | "processing" | "error" | "idle";
+export type VoicePhase = "ask" | "starting" | "listening" | "processing" | "error" | "done" | "idle";
 export const BARS = 25;
 const FLAT = Array<number>(BARS).fill(0);
 
@@ -80,6 +80,7 @@ export function useVoice({ maxSeconds, onLimit }: { maxSeconds: number; onLimit?
     setPhase("processing");
     try {
       const final = await t.stop();
+      if (alive.current) setPhase("done");
       return final;
     } catch (e) {
       if (alive.current) fail(e);
@@ -97,16 +98,20 @@ export function useVoice({ maxSeconds, onLimit }: { maxSeconds: number; onLimit?
     return () => { alive.current = false; transcriber.current?.cancel(); transcriber.current = null; };
   }, []);
 
+  const limitRef = useRef(onLimit);
+  useEffect(() => { limitRef.current = onLimit; });
   useEffect(() => {
     if (phase !== "listening") return;
-    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
+    let elapsed = 0;
+    const timer = setInterval(() => {
+      elapsed += 1;
+      setSeconds(elapsed);
+      if (elapsed < maxSeconds) return;
+      clearInterval(timer);
+      void finish().then((final) => { if (final && alive.current) limitRef.current?.(final); });
+    }, 1000);
     return () => clearInterval(timer);
-  }, [phase]);
-
-  useEffect(() => {
-    if (phase !== "listening" || seconds < maxSeconds) return;
-    void finish().then((final) => { if (final && alive.current) onLimit?.(final); });
-  }, [phase, seconds, maxSeconds, finish, onLimit]);
+  }, [phase, maxSeconds, finish]);
 
   return { phase, text, levels, seconds, error, begin, start, finish, cancel };
 }

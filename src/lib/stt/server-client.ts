@@ -45,6 +45,7 @@ export class ServerTranscriber implements Transcriber {
     form.append("seconds", String(seconds));
     let res: Response;
     try { res = await fetch("/api/transcribe", { method: "POST", body: form }); } catch { throw new VoiceError("failed"); }
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full load so the proxy re-checks the session
     if (res.status === 401) { window.location.assign("/welcome"); throw new VoiceError("failed"); }
     if (res.status === 429) throw new VoiceError("daily_limit");
     if (!res.ok) throw new VoiceError("failed");

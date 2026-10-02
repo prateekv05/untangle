@@ -46,4 +46,28 @@ test.describe("real model", () => {
     expect(undone.plan).toEqual(planned.plan);
     expect(undone.tasks.find((t: { id: string }) => t.id === other.taskId).durationMin).toBe(planned.tasks.find((t: { id: string }) => t.id === other.taskId).durationMin);
   });
+
+  test("re-plan reads the sentence, keeps finished blocks, saves a replan version and says what changed", async ({ request, user }) => {
+    const headers = { cookie: `authjs.session-token=${await sessionCookieValue(user)}` };
+    const understood = await (await request.post("/api/understand", { headers, data: { text: DUMP } })).json();
+    const planned = await (await request.post("/api/plan", { headers, data: { dayId: understood.dayId, mode: "dayoff", tasks: understood.tasks } })).json();
+    const first = planned.plan.blocks[0];
+    expect((await request.patch(`/api/tasks/${first.taskId}`, { headers, data: { status: "done" } })).status()).toBe(200);
+
+    const res = await request.post("/api/replan", { headers, data: { dayId: understood.dayId, instruction: "I'm running about an hour late" } });
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.version).toBe(2);
+    expect(body.plan.blocks.find((b: { taskId: string }) => b.taskId === first.taskId)).toEqual(first);
+    expect(body.changes.at).toMatch(/^\d\d:\d\d$/);
+    expect(body.changes.lines.length).toBeGreaterThan(0);
+    const covered = new Set<string>([...body.plan.blocks.map((b: { taskId: string }) => b.taskId), ...body.plan.dropped.map((d: { taskId: string }) => d.taskId)]);
+    expect([...covered].sort()).toEqual(body.tasks.filter((t: { status: string }) => t.status !== "moved").map((t: { id: string }) => t.id).sort());
+
+    // a sentence that is not about the day changes nothing: no new version is saved
+    const nonsense = await request.post("/api/replan", { headers, data: { dayId: understood.dayId, instruction: "what is the capital of France" } });
+    expect(nonsense.status()).toBe(502);
+    const saved = await (await request.get(`/api/day?date=${understood.date}`, { headers })).json();
+    expect(saved.day.plan.version).toBe(2);
+  });
 });

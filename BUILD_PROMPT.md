@@ -97,7 +97,7 @@ First, tell me before writing code: (a) the Auth.js version you will install and
 [x] Acceptance: a signed-out visitor sees only the Welcome screen and every API route returns 401; a new Google account is routed through onboarding exactly once; signing in with Google (or password, if set) in a second browser shows exactly the same days, tasks, plans, presets and settings; setting, changing and removing a password works and Google sign-in still works afterwards; sign-out returns to Welcome; refresh keeps state; routes reject malformed input with 400 and typed errors and never leak stack traces; password hashes never leave the server; Google failure shows the quiet error and lets me retry; no secrets in the client bundle; no gender or name in logs or prompts (grep); axe has no serious issues; typecheck, lint, test pass; screenshots at 390 px in both themes.
 ```
 
-## [ ] Phase 4: understand
+## [x] Phase 4: understand
 
 ```
 Phase 4. Implement the understand call.
@@ -108,7 +108,7 @@ Phase 4. Implement the understand call.
 4. [x] Wire Dump → thinking → Understand to the real route. Show real questions and the relationship card from `groupings`. Answers update tasks (due, durationMin + durationSource: "user", fixedStart).
 5. [x] Extend evals: write the eval runner skeleton (scripts/eval.ts) that can run the `pipeline` cases through understand only for now and checks taskCount, taskHas, questionAsked, noQuestion, noInventedDue, planFor, noTaskContains, noOutputContains.
 
-[ ] Acceptance: understand works with each of the four models (same prompt, same schema; report any that cannot structured-output reliably); the canonical dump yields 7 tasks with correct locations; asks a due question for SQL and a duration question for gym and nothing else; "gym for 90 minutes" asks no duration question; the injection case is ignored; evals for understand pass at ≥ 95% over 3 runs.
+[x] Acceptance: understand works with each of the four models (same prompt, same schema; report any that cannot structured-output reliably); the canonical dump yields 7 tasks with correct locations; asks a due question for SQL and a duration question for gym and nothing else; "gym for 90 minutes" asks no duration question; the injection case is ignored; evals for understand pass at ≥ 95% over 3 runs.
 ```
 
 ## [ ] Phase 5: plan + validator + fallback

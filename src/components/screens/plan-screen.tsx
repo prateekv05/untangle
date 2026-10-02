@@ -34,7 +34,7 @@ export const dateHeading = (d: Date): string => d.toLocaleDateString("en-US", { 
 
 export function PlanScreen(p: {
   plan: Plan; tasks: Task[]; done: string[]; moved: Moved[]; expanded: string | null; replan: Replan | null; mode: PlanMode;
-  plannedAt: string; entrance: boolean; settings: Settings; presets: Preset[]; today: Date;
+  plannedAt: string; entrance: boolean; offline?: boolean; settings: Settings; presets: Preset[]; today: Date;
   onExpand: (id: string) => void; onToggleDone: (id: string) => void; onEdit: (id: string) => void; onMove: (id: string) => void;
   onBringBack: (id: string) => void; onAdd: (t: Omit<Task, "id">) => void; onReplan: (mic: boolean) => void; onNewDump: () => void; onSettings: () => void;
 }) {
@@ -70,7 +70,7 @@ export function PlanScreen(p: {
     return (
       <ThreadRow key={b.taskId} time={b.start} where={task.location} first={extra.first} last={extra.last} taut={extra.taut} ring={extra.taut ? "outing" : "ground"} index={i} outingCount={extra.n}>
         <TaskBlock
-          task={task} block={b} done={doneSet.has(b.taskId)} expanded={p.expanded === b.taskId} was={p.replan?.was[b.taskId]}
+          task={task} block={b} locked={p.offline} done={doneSet.has(b.taskId)} expanded={p.expanded === b.taskId} was={p.replan?.was[b.taskId]}
           onExpand={() => p.onExpand(b.taskId)} onToggleDone={() => p.onToggleDone(b.taskId)} onEdit={() => p.onEdit(b.taskId)} onMove={() => p.onMove(b.taskId)}
         />
       </ThreadRow>
@@ -143,7 +143,7 @@ export function PlanScreen(p: {
               {p.moved.map((m) => (
                 <li key={m.taskId} className="flex min-h-11 items-center justify-between gap-3">
                   <span className="font-medium">{byId.get(m.taskId)?.title}<span className="text-ink-muted">, {fmtMoveDate(m.to)}</span></span>
-                  <button type="button" onClick={() => p.onBringBack(m.taskId)} className="min-h-11 rounded-pill border border-line bg-surface px-4 text-sm font-semibold">Bring back</button>
+                  <button type="button" disabled={p.offline} onClick={() => p.onBringBack(m.taskId)} className="min-h-11 rounded-pill border border-line bg-surface px-4 text-sm font-semibold">Bring back</button>
                 </li>
               ))}
             </ul>
@@ -153,18 +153,18 @@ export function PlanScreen(p: {
           {adding ? (
             <AddTaskCard presets={p.presets} onAdd={(t) => { p.onAdd(t); setAdding(false); }} onCancel={() => setAdding(false)} />
           ) : (
-            <button type="button" onClick={() => setAdding(true)} className="min-h-[52px] w-full rounded-md border border-dashed border-line bg-transparent text-[15px] font-medium leading-5 text-ink-muted">+ Forgot something? Add it</button>
+            <button type="button" disabled={p.offline} onClick={() => setAdding(true)} className="min-h-[52px] w-full rounded-md border border-dashed border-line bg-transparent text-[15px] font-medium leading-5 text-ink-muted">+ Forgot something? Add it</button>
           )}
           <div className="mt-1 flex justify-center">
-            <button type="button" onClick={p.onNewDump} className="min-h-11 border-0 bg-transparent px-4 text-sm font-semibold text-ink-muted underline">Start a new dump</button>
+            <button type="button" disabled={p.offline} onClick={p.onNewDump} className="min-h-11 border-0 bg-transparent px-4 text-sm font-semibold text-ink-muted underline">Start a new dump</button>
           </div>
         </div>
       </main>
       <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[430px] border-t border-line bg-surface px-5 pb-7 pt-3">
         <p className="voice-sm m-0 mb-2.5 text-ink-muted">Plans change. Tell me what happened.</p>
         <div className="flex gap-2.5">
-          <button type="button" aria-label="Talk to re-plan" onClick={() => p.onReplan(true)} className="grid size-[52px] flex-none place-items-center rounded-md border border-line bg-surface-soft text-ink"><Icon name="mic" size={24} /></button>
-          <div className="flex-1"><Button icon="refresh" onClick={() => p.onReplan(false)}>Re-plan my day</Button></div>
+          <button type="button" aria-label="Talk to re-plan" disabled={p.offline} onClick={() => p.onReplan(true)} className="grid size-[52px] flex-none place-items-center rounded-md border border-line bg-surface-soft text-ink"><Icon name="mic" size={24} /></button>
+          <div className="flex-1"><Button icon="refresh" disabled={p.offline} onClick={() => p.onReplan(false)}>Re-plan my day</Button></div>
         </div>
       </div>
     </div>

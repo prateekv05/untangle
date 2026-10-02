@@ -45,6 +45,8 @@ export function AccountSection({ onPassword }: { onPassword: (hasPassword: boole
     setSigningOut(true);
     try {
       await signOutAction();
+      // The service worker keeps the last plan for offline reading: drop it so the next person on this phone cannot open it.
+      if ("caches" in window) await Promise.all((await caches.keys()).map((k) => caches.delete(k)));
     } finally {
       // Full load so the proxy sees the cleared session.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination

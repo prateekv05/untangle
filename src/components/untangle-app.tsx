@@ -13,6 +13,7 @@ import type { Preset } from "@/lib/guess";
 import type { Question, Task } from "@/lib/schemas";
 import { localClock } from "@/lib/timezone";
 import { toHHMM } from "@/lib/time";
+import { useOnline } from "@/lib/use-online";
 import type { Where } from "@/lib/where";
 import { DumpScreen } from "./screens/dump-screen";
 import { ListeningScreen } from "./screens/listening-screen";
@@ -26,6 +27,7 @@ import { PasswordSheet } from "./sheets/password-sheet";
 import { PresetsSheet } from "./sheets/presets-sheet";
 import { ReplanSheet } from "./sheets/replan-sheet";
 import { SettingsSheet } from "./sheets/settings-sheet";
+import { OfflineNote } from "./offline-note";
 import { Toast } from "./toast";
 
 const noopSubscribe = () => () => {};
@@ -49,6 +51,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   });
   const search = useSyncExternalStore(noopSubscribe, () => window.location.search, () => "");
   const demo = new URLSearchParams(search).get("demo") === "1";
+  const offline = !useOnline();
   const [micOnOpen, setMicOnOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [taken, setTaken] = useState<string[]>([]);
@@ -324,14 +327,14 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         onAdd={(task) => dispatch({ type: "addTask", task, now: now() })}
         onBuild={startPlan}
         onBack={() => dispatch({ type: "screen", screen: "dump" })}
-        onSettings={openSettings}
+        onSettings={openSettings} offline={offline}
       />
     );
   } else if (s.screen === "plan" && s.plan) {
     screen = (
       <PlanScreen
         plan={s.plan} tasks={s.tasks} done={s.done} moved={s.moved} expanded={s.expanded} replan={s.replan} mode={s.mode}
-        plannedAt={s.plannedAt} entrance={s.entrance} settings={s.settings} presets={s.presets} today={today}
+        plannedAt={s.plannedAt} entrance={s.entrance} offline={offline} settings={s.settings} presets={s.presets} today={today}
         onExpand={(taskId) => dispatch({ type: "expand", taskId })}
         onToggleDone={toggleDone}
         onEdit={(taskId) => dispatch({ type: "sheet", sheet: { type: "edit", taskId } })}
@@ -350,7 +353,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         onMic={() => dispatch({ type: "screen", screen: "listening" })}
         onSubmit={submitDump} onSettings={openSettings}
         onYours={() => dispatch({ type: "sheet", sheet: { type: "presets" } })}
-        presets={s.presets} notice={notice} name={name}
+        presets={s.presets} notice={notice} name={name} offline={offline}
         carried={carried} onCarry={(title) => { dispatch({ type: "text", text: `${s.text.trim() ? `${s.text.trim()}\n` : ""}${title}` }); setTaken((t) => [...t, title]); }}
         examples={demo ? EXAMPLES : undefined} onExample={(text) => dispatch({ type: "text", text })}
       />
@@ -359,6 +362,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-[430px]">
+      {offline && <OfflineNote />}
       {screen}
       {editTask && (
         <EditSheet

@@ -14,11 +14,11 @@ import { SegmentedControl } from "../segmented-control";
 import { TopBar } from "../top-bar";
 import { UnderstandRow } from "../understand-row";
 
-export function UnderstandScreen({ tasks, questions, groupings = [], mode, presets, onMode, onAnswer, onRemove, onWhere, onDuration, onAdd, onBuild, onBack, onSettings }: {
+export function UnderstandScreen({ tasks, questions, groupings = [], mode, presets, onMode, onAnswer, onRemove, onWhere, onDuration, onAdd, onBuild, onBack, onSettings, offline }: {
   tasks: Task[]; questions: Question[]; groupings?: Grouping[]; mode: PlanMode; presets: Preset[];
   onMode: (m: PlanMode) => void; onAnswer: (q: Question, v: string | number | null) => void; onRemove: (id: string) => void;
   onWhere: (id: string, w: Where) => void; onDuration: (id: string, min: number | null) => void;
-  onAdd: (t: Omit<Task, "id">) => void; onBuild: () => void; onBack: () => void; onSettings: () => void;
+  onAdd: (t: Omit<Task, "id">) => void; onBuild: () => void; onBack: () => void; onSettings: () => void; offline?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   return (
@@ -44,7 +44,7 @@ export function UnderstandScreen({ tasks, questions, groupings = [], mode, prese
             + Forgot something? Add it
           </button>
         )}
-        <div className="mt-6"><Button disabled={tasks.length === 0} onClick={onBuild}>Build my day</Button></div>
+        <div className="mt-6"><Button disabled={tasks.length === 0 || offline} onClick={onBuild}>Build my day</Button></div>
         <div className="mt-1.5 flex justify-center"><Button variant="quiet" onClick={onBack}>Edit my list</Button></div>
       </main>
     </div>

@@ -12,8 +12,8 @@ import { FactPill, WhereTag } from "./where-tag";
  * One task on the Thread. Tap the card (or its name) to expand; tap the circle to finish.
  * Expanded: Finished, Edit, Move later. Finished: name struck through, circle filled, block stays put.
  */
-export function TaskBlock({ task, block, done, expanded, was, onExpand, onToggleDone, onEdit, onMove }: {
-  task: Task; block: Block; done?: boolean; expanded?: boolean; was?: string;
+export function TaskBlock({ task, block, done, expanded, was, locked, onExpand, onToggleDone, onEdit, onMove }: {
+  task: Task; block: Block; done?: boolean; expanded?: boolean; was?: string; locked?: boolean;
   onExpand?: () => void; onToggleDone?: () => void; onEdit?: () => void; onMove?: () => void;
 }) {
   const guessed = needsDuration(task);
@@ -41,6 +41,7 @@ export function TaskBlock({ task, block, done, expanded, was, onExpand, onToggle
           role="checkbox"
           aria-checked={!!done}
           aria-label={`${done ? "Undo finish" : "Finish"} ${task.title}`}
+          disabled={locked}
           onClick={(e) => { e.stopPropagation(); onToggleDone?.(); }}
           className="-m-2.5 grid size-11 shrink-0 place-items-center border-0 bg-transparent"
         >
@@ -59,18 +60,18 @@ export function TaskBlock({ task, block, done, expanded, was, onExpand, onToggle
       <p className="voice m-0 mt-2.5 rounded-sm bg-surface-soft px-3 py-[9px]">{block.reason}</p>
       {expanded && (
         <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
-          <ActionButton tone="done" onClick={onToggleDone}>{done ? "Undo" : "Finished"}</ActionButton>
-          <ActionButton onClick={onEdit}>Edit</ActionButton>
-          <ActionButton onClick={onMove}>Move later</ActionButton>
+          <ActionButton tone="done" disabled={locked} onClick={onToggleDone}>{done ? "Undo" : "Finished"}</ActionButton>
+          <ActionButton disabled={locked} onClick={onEdit}>Edit</ActionButton>
+          <ActionButton disabled={locked} onClick={onMove}>Move later</ActionButton>
         </div>
       )}
     </div>
   );
 }
 
-function ActionButton({ children, onClick, tone }: { children: string; onClick?: () => void; tone?: "done" }) {
+function ActionButton({ children, onClick, tone, disabled }: { children: string; onClick?: () => void; tone?: "done"; disabled?: boolean }) {
   return (
-    <button type="button" onClick={onClick} className={cn("min-h-11 flex-1 rounded-sm border-0 text-sm font-semibold leading-5", tone === "done" ? "bg-outside-tint text-outside-ink" : "bg-surface-soft text-ink")}>
+    <button type="button" disabled={disabled} onClick={onClick} className={cn("min-h-11 flex-1 rounded-sm border-0 text-sm font-semibold leading-5", tone === "done" ? "bg-outside-tint text-outside-ink" : "bg-surface-soft text-ink")}>
       {children}
     </button>
   );

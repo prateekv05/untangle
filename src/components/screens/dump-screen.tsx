@@ -12,10 +12,10 @@ const PLACEHOLDER = "SQL assignment, gym, groceries, call Mom, send resume to Sa
 
 export const countLabel = (n: number): string => (n === 0 ? "Nothing yet" : n === 1 ? "1 thing so far" : `${n} things so far`);
 
-export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours, presets, carried = [], onCarry, notice, examples, onExample, name }: {
+export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours, presets, carried = [], onCarry, notice, examples, onExample, name, offline }: {
   text: string; onText: (t: string) => void; onMic: () => void; onSubmit: () => void; onSettings: () => void; onYours: () => void;
   presets: Preset[]; carried?: string[]; onCarry?: (title: string) => void; notice?: string | null;
-  examples?: { label: string; text: string }[]; onExample?: (text: string) => void; name?: string | null;
+  examples?: { label: string; text: string }[]; onExample?: (text: string) => void; name?: string | null; offline?: boolean;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const noticeId = useId();
@@ -51,7 +51,7 @@ export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours,
           />
           <div className="flex items-center justify-between">
             <span aria-live="polite" className="text-[13px] font-medium leading-[18px] text-ink-muted">{countLabel(n)}</span>
-            <button type="button" aria-label="Tap to talk" onClick={onMic} className="grid size-[68px] place-items-center rounded-full border-0 bg-ink text-ink-inverse">
+            <button type="button" aria-label="Tap to talk" disabled={offline} onClick={onMic} className="grid size-[68px] place-items-center rounded-full border-0 bg-ink text-ink-inverse">
               <Icon name="mic" size={30} />
             </button>
           </div>
@@ -68,7 +68,7 @@ export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours,
           </div>
         )}
         <div className="mt-auto pb-8 pt-6">
-          <Button disabled={n < 1} onClick={onSubmit}>Untangle my day</Button>
+          <Button disabled={n < 1 || offline} onClick={onSubmit}>Untangle my day</Button>
         </div>
       </main>
     </div>

@@ -20,7 +20,7 @@ const zones = (current: string): string[] => {
 };
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSave, onPresets, onPassword, onClose }: { loadFailed: boolean; onRetry: () => void; settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onPassword: (hasPassword: boolean) => void; onClose: () => void }) {
+export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSave, onPresets, onHistory, onPassword, onClose }: { loadFailed: boolean; onRetry: () => void; settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onHistory: () => void; onPassword: (hasPassword: boolean) => void; onClose: () => void }) {
   const [s, setS] = useState(settings);
   const [pref, setPref] = useState<ThemePref>(() => themePreference());
   const id = useId();
@@ -60,6 +60,9 @@ export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSa
         </select>
         <button type="button" onClick={onPresets} className="mb-4 flex min-h-[52px] w-full items-center justify-between rounded-md bg-surface-soft px-4 text-left font-semibold">
           Presets <span className="font-medium text-ink-muted">{presetCount === 0 ? "None yet" : presetCount === 1 ? "1 yours" : `${presetCount} yours`}</span>
+        </button>
+        <button type="button" onClick={onHistory} className="mb-4 flex min-h-[52px] w-full items-center justify-between rounded-md bg-surface-soft px-4 text-left font-semibold">
+          Past days <span className="font-medium text-ink-muted">View</span>
         </button>
         <p className={label}>Appearance</p>
         <SegmentedControl<ThemePref> label="Appearance" value={pref} onChange={(v) => { setPref(v); setThemePreference(v); }} options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "System" }]} />

@@ -1,5 +1,6 @@
 /** Browser-side calls to the account routes. Each rejects on a non-2xx so callers can roll an optimistic update back. */
 import type { Preset } from "./guess";
+import type { HistoryItem } from "../db/queries/history";
 import type { DayView, ReplanView } from "./day-response";
 import type { DayEditBody } from "./api-schemas";
 import type { DraftPayload } from "./draft";
@@ -83,3 +84,9 @@ export const putDraft = (d: DraftPayload) => call<void>("/api/draft", { method: 
 export const deleteDraft = () => call<void>("/api/draft", { method: "DELETE" });
 /** For when the page is going away: `keepalive` lets the request finish after the tab closes. */
 export const putDraftOnExit = (d: DraftPayload) => { void fetch("/api/draft", { method: "PUT", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) }).catch(() => {}); };
+
+export type { HistoryItem };
+export type HistoryDay = { date: string; mode: "workday" | "dayoff"; tasks: DayView["tasks"]; plan: Plan; plannedAt: string };
+/** Past planned days (newest first) and one of them, read-only. */
+export const getHistory = async () => (await call<{ days: HistoryItem[] }>("/api/history")).days;
+export const getHistoryDay = (dayId: string) => call<HistoryDay>(`/api/history/${dayId}`);

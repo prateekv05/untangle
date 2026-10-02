@@ -28,6 +28,7 @@ import { NewDumpSheet } from "./sheets/new-dump-sheet";
 import { PasswordSheet } from "./sheets/password-sheet";
 import { PresetsSheet } from "./sheets/presets-sheet";
 import { ReplanSheet } from "./sheets/replan-sheet";
+import { HistoryScreen } from "./screens/history-screen";
 import { SettingsSheet } from "./sheets/settings-sheet";
 import { BootSkeleton } from "./boot-skeleton";
 import { OfflineNote } from "./offline-note";
@@ -145,6 +146,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
 
   const now = useCallback(() => nowMinutes(window.location.search), []);
   const today = useMemo(() => new Date(), []);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const closeSheet = () => dispatch({ type: "sheet", sheet: null });
   const openSettings = () => dispatch({ type: "sheet", sheet: { type: "settings" } });
 
@@ -411,10 +413,11 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
       )}
       {s.sheet?.type === "newdump" && <NewDumpSheet onClose={closeSheet} onConfirm={() => dispatch({ type: "reset" })} />}
       {s.sheet?.type === "settings" && account !== "loading" && (
-        <SettingsSheet loadFailed={account === "failed"} onRetry={retryLoad} settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={saveSettings} />
+        <SettingsSheet loadFailed={account === "failed"} onRetry={retryLoad} settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onHistory={() => { closeSheet(); setHistoryOpen(true); }} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={saveSettings} />
       )}
       {s.sheet?.type === "password" && <PasswordSheet hasPassword={hasPassword} onClose={() => dispatch({ type: "sheet", sheet: { type: "settings" } })} onDone={(text) => { dispatch({ type: "sheet", sheet: { type: "settings" } }); dispatch({ type: "toast", text }); }} />}
       {s.sheet?.type === "presets" && <PresetsSheet presets={s.presets} onAdd={addPreset} onRemove={removePreset} onClose={closeSheet} />}
+      {historyOpen && <HistoryScreen onClose={() => setHistoryOpen(false)} />}
       {s.toast && <Toast {...s.toast} onUndo={undoLast} onDone={() => dispatch({ type: "toast", text: null })} />}
     </div>
   );

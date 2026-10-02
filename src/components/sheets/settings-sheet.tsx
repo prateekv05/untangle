@@ -24,10 +24,10 @@ export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSa
   const [s, setS] = useState(settings);
   const [pref, setPref] = useState<ThemePref>(() => themePreference());
   const id = useId();
-  const field = "min-h-11 w-full rounded-md border border-line bg-surface-soft px-3.5 text-base";
+  const field = "min-h-11 w-full min-w-0 max-w-full appearance-none rounded-md border border-line bg-surface-soft px-3.5 text-base";
   const label = "mb-1.5 block text-[13px] font-medium leading-[18px] text-ink-muted";
   const time = (key: "workStart" | "workEnd" | "wake" | "sleep", text: string) => (
-    <div className="flex-1">
+    <div className="min-w-0 flex-1">
       <label htmlFor={`${id}-${key}`} className={label}>{text}</label>
       <input id={`${id}-${key}`} type="time" value={s[key]} onChange={(e) => e.target.value && setS({ ...s, [key]: e.target.value })} className={field} />
     </div>
@@ -49,7 +49,7 @@ export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSa
           {DAYS.map(([name, d]) => {
             const on = s.workDays.includes(d);
             return (
-              <button key={d} type="button" aria-pressed={on} aria-label={DAY_NAMES[d]} onClick={() => toggleDay(d)} className={cn("min-h-11 flex-1 rounded-sm border text-sm font-semibold", on ? "border-ink bg-ink text-ink-inverse" : "border-line bg-surface text-ink")}>{name}</button>
+              <button key={d} type="button" aria-pressed={on} aria-label={DAY_NAMES[d]} onClick={() => toggleDay(d)} className={cn("min-h-11 min-w-0 flex-1 rounded-sm border text-sm font-semibold", on ? "border-ink bg-ink text-ink-inverse" : "border-line bg-surface text-ink")}>{name}</button>
             );
           })}
         </div>

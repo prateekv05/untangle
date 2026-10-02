@@ -37,7 +37,12 @@ export async function runPlanPipeline(input: PlanInput, generate: PlanGenerator,
   // The model plans the open tasks only; finished blocks are put back untouched before anything is checked or shown.
   const withKept = (plan: Plan): Plan =>
     kept.length ? { ...plan, blocks: [...kept, ...plan.blocks].sort((a, b) => toMin(a.start) - toMin(b.start)) } : plan;
-  const check = (plan: Plan) => validatePlan(plan, input.tasks, input.settings, { mode: input.mode, minStart: input.planFrom, keptTaskIds });
+  const limits = input.limits;
+  const check = (plan: Plan) =>
+    validatePlan(plan, input.tasks, input.settings, {
+      mode: input.mode, minStart: input.planFrom, keptTaskIds,
+      durationOverrides: limits?.durationOverrides, capacityMin: limits?.capacityMin, lighterAfter: limits?.lighterAfter, mustFinishTaskIds: limits?.mustFinishTaskIds,
+    });
 
   for (let attempt = 0; attempt < 2; attempt++) {
     let g: PlanGeneration;
@@ -62,7 +67,10 @@ export async function runPlanPipeline(input: PlanInput, generate: PlanGenerator,
     repair = { previous: g.plan, errors };
   }
 
-  const plan = planDay(input.tasks, input.settings, { mode: input.mode, minStart: input.planFrom, fixedBlocks: kept });
+  const plan = planDay(input.tasks, input.settings, {
+    mode: input.mode, minStart: input.planFrom, fixedBlocks: kept,
+    capacityMin: limits?.capacityMin, lighterAfter: limits?.lighterAfter, mustFinishTaskIds: limits?.mustFinishTaskIds, durationOverrides: limits?.durationOverrides,
+  });
   const result: PipelineResult = { plan, source: "fallback", model: null, repaired: false, latencyMs: Date.now() - started, inputTokens, outputTokens, validatorErrors };
   log(route, result, lastModel, failure);
   return result;

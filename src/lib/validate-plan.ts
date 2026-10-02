@@ -14,7 +14,16 @@ export interface ValidateContext {
   keptTaskIds?: string[];
   /** Expected duration per task when it differs from task.durationMin (e.g. "60 min left"). */
   durationOverrides?: Record<string, number>;
+  /** Re-plan: "I only have 3 hours". Total minutes of scheduled non-fixed work (finished blocks excluded) may not exceed it. */
+  capacityMin?: number | null;
+  /** Re-plan: minutes since midnight. At most LIGHT_LIMIT_MIN of non-fixed work may start at or after it. */
+  lighterAfter?: number | null;
+  /** Re-plan: tasks the user must finish today. They may not be dropped. */
+  mustFinishTaskIds?: string[];
 }
+
+/** The planner budgets 90 minutes after "lighter afternoon"; the checker allows a little slack. */
+export const LIGHT_LIMIT_MIN = 100;
 
 export function validatePlan(plan: Plan, tasks: Task[], s: Settings, ctx: ValidateContext): string[] {
   const errs: string[] = [];
@@ -76,6 +85,20 @@ export function validatePlan(plan: Plan, tasks: Task[], s: Settings, ctx: Valida
     const between = blocks.filter((b) => toMin(b.start) > toMin(trip[i - 1].start) && toMin(b.start) < toMin(trip[i].start) && !b.outingId);
     if (between.length) errs.push("Something non-outing sits in the middle of the outing.");
   }
+
+  // re-plan limits: work the user is about to do (not finished blocks, not fixed commitments)
+  const flexible = blocks.filter((b) => !kept.has(b.taskId) && byId.get(b.taskId)?.kind !== "fixed");
+  if (ctx.capacityMin != null) {
+    const total = flexible.reduce((n, b) => n + b.durationMin, 0);
+    if (total > ctx.capacityMin) errs.push(`${total} min of work is planned but the limit is ${ctx.capacityMin} min. Drop the lowest priority tasks.`);
+  }
+  if (ctx.lighterAfter != null) {
+    const late = flexible.filter((b) => toMin(b.start) >= ctx.lighterAfter!).reduce((n, b) => n + b.durationMin, 0);
+    if (late > LIGHT_LIMIT_MIN) errs.push(`${late} min of work starts after the lighter time; keep it to about 90 min.`);
+  }
+  plan.dropped.forEach((d) => {
+    if (ctx.mustFinishTaskIds?.includes(d.taskId)) errs.push(`"${byId.get(d.taskId)?.title}" must be finished today and cannot be dropped.`);
+  });
 
   if (plan.decisions.length > 6) errs.push("More than 6 decisions.");
   plan.dropped.forEach((d) => { if (!d.why.trim()) errs.push("A dropped task has no reason."); });

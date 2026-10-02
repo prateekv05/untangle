@@ -84,3 +84,34 @@ test("finished blocks are kept exactly, the model plans only the open tasks, and
   assert.deepEqual(fb.plan.blocks.filter((b) => b.taskId === "a"), keptBlocks);
   assert.ok(fb.plan.blocks.filter((b) => b.taskId !== "a").every((b) => b.start >= "10:00"));
 });
+
+const limited: PlanInput = {
+  ...input,
+  tasks: [task("a", { durationMin: 60 }), task("b", { kind: "deep", durationMin: 90, due: "tomorrow" }), task("c", { durationMin: 45 })],
+  limits: { capacityMin: 100, lighterAfter: null, mustFinishTaskIds: ["b"], durationOverrides: { a: 30 } },
+};
+
+test("the plan message states the re-plan limits and the shortened durations", () => {
+  const m = buildPlanMessage(limited);
+  assert.match(m, /"capacityMin":100/);
+  assert.match(m, /"mustFinishTaskIds":\["b"\]/);
+  assert.match(m, /"id":"a"[^}]*"durationMin":30/);
+});
+
+test("a plan over the capacity is rejected and the fallback keeps to the limits", async () => {
+  const over = planDay(limited.tasks, input.settings, { mode: "dayoff", minStart: input.planFrom });
+  const r = await runPlanPipeline(limited, gen(over, over));
+  assert.equal(r.source, "fallback");
+  assert.ok(r.validatorErrors.some((e) => /limit is 100/.test(e)));
+  const minutes = r.plan.blocks.reduce((n, b) => n + b.durationMin, 0);
+  assert.ok(minutes <= 100);
+  assert.ok(r.plan.blocks.some((b) => b.taskId === "b"));
+  assert.equal(r.plan.blocks.find((b) => b.taskId === "a")?.durationMin ?? 30, 30);
+  assert.deepEqual(validatePlan(r.plan, limited.tasks, input.settings, { mode: "dayoff", minStart: input.planFrom, capacityMin: 100, mustFinishTaskIds: ["b"], durationOverrides: { a: 30 } }), []);
+});
+
+test("dropping a must-finish task is an error", () => {
+  const dropB: Plan = { ...good, blocks: good.blocks.filter((b) => b.taskId !== "b"), dropped: [{ taskId: "b", why: "later" }] };
+  const errs = validatePlan(dropB, input.tasks, input.settings, { mode: "dayoff", mustFinishTaskIds: ["b"] });
+  assert.ok(errs.some((e) => /must be finished/.test(e)));
+});

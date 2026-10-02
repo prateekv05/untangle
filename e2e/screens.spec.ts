@@ -1,6 +1,9 @@
 import { test } from "./fixtures";
 import { mkdirSync } from "node:fs";
 import { openDump, setNow, EXAMPLE } from "./helpers";
+import { FAKE_MIC, fakeSpeech } from "./voice-fakes";
+
+test.use(FAKE_MIC);
 
 const OUT = process.env.SHOT_DIR ?? "test-results/screens";
 mkdirSync(OUT, { recursive: true });
@@ -57,9 +60,10 @@ for (const scheme of ["light", "dark"] as const) {
 
   test(`listening and gallery, ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
-    await page.goto("/?listen=24&demo=1");
+    await fakeSpeech(page, ["Okay, tomorrow I need to finish my SQL assignment,", "I have to go grocery shopping,", "I need to call my mom,", "I want to go to the gym,", "I need to send Sarah my resume,", "and I really need to spend some time on my app"]);
+    await page.goto("/?demo=1");
     await page.getByRole("button", { name: "Tap to talk" }).click();
-    await page.getByText("Six things so far.").waitFor();
+    await page.getByText("Five things so far.").waitFor();
     await page.screenshot({ path: `${OUT}/02-listening-${scheme}.png` });
   });
 }

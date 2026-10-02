@@ -19,6 +19,9 @@ const ctor = (): Ctor | undefined => {
 /** Safari's implementation is unreliable (docs/VOICE.md), so it is left to the server path even though it exists. */
 export const isSafari = (ua: string): boolean => /iPad|iPhone|iPod/.test(ua) || (/Safari\//.test(ua) && !/Chrome\/|Chromium\/|Edg\/|Android/.test(ua));
 
+/** Engines differ on leading and trailing spaces between phrases. */
+const tidy = (s: string) => s.replace(/\s+/g, " ").trim();
+
 export class WebSpeechTranscriber implements Transcriber {
   private rec: Recognition | null = null;
   private stream: MediaStream | null = null;
@@ -54,7 +57,7 @@ export class WebSpeechTranscriber implements Transcriber {
         if (r.isFinal) this.finals += `${r[0].transcript} `; else interim += r[0].transcript;
       }
       this.interim = interim;
-      onPartial(`${this.finals}${interim}`.trim());
+      onPartial(tidy(`${this.finals}${interim}`));
     };
     rec.onerror = (e) => {
       if (e.error === "no-speech" || e.error === "aborted") return;
@@ -74,7 +77,7 @@ export class WebSpeechTranscriber implements Transcriber {
     if (!rec) throw new VoiceError("failed");
     this.ending = true;
     await new Promise<void>((resolve) => { this.ended = resolve; rec.stop(); setTimeout(resolve, 1500); });
-    const text = `${this.finals}${this.interim}`.trim();
+    const text = tidy(`${this.finals}${this.interim}`);
     this.release();
     if (this.failure && !text) throw this.failure;
     if (!text) throw new VoiceError("empty");

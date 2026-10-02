@@ -32,3 +32,10 @@ test("prompts and AI code never mention the user's name or gender", () => {
   const bad = ai.filter((f) => /\b(gender|user\.name|userName|passwordHash)\b/.test(f.text));
   assert.deepEqual(bad.map((f) => f.path), []);
 });
+
+test("audio is never written anywhere: the transcribe path has no file or storage writes (the only database call is the usage counter)", () => {
+  const audio = files.filter((f) => /^(app\/api\/transcribe|lib\/stt)\//.test(f.path));
+  assert.ok(audio.length >= 6);
+  const bad = audio.filter((f) => /node:fs|from "fs"|@vercel\/blob|writeFile|\.insert\(|localStorage|sessionStorage|indexedDB/.test(f.text));
+  assert.deepEqual(bad.map((f) => f.path), []);
+});

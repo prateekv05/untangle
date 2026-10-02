@@ -2,6 +2,9 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { openDump, setNow, toUnderstand, EXAMPLE } from "./helpers";
+import { FAKE_MIC, fakeSpeech } from "./voice-fakes";
+
+test.use(FAKE_MIC);
 
 async function axe(page: Page, label: string) {
   const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
@@ -46,9 +49,10 @@ for (const scheme of ["light", "dark"] as const) {
 
   test(`axe on listening and gallery, ${scheme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: "reduce" });
-    await page.goto("/?listen=24");
+    await fakeSpeech(page, ["Okay, tomorrow I need to finish my SQL assignment,", "I have to go grocery shopping,", "and call my mom,"]);
+    await page.goto("/");
     await page.getByRole("button", { name: "Tap to talk" }).click();
-    await page.getByText("Six things so far.").waitFor();
+    await page.getByText("Three things so far.").waitFor();
     await axe(page, "listening");
     await page.goto("/dev/gallery");
     await axe(page, "gallery");

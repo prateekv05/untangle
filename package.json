@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --webpack",
+    "prebuild": "node scripts/gen-prompts.mjs",
     "build": "next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.sw.json",
@@ -13,6 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "eval": "tsx scripts/eval.ts",
+    "prompts": "node scripts/gen-prompts.mjs",
     "e2e": "playwright test",
     "db:migrate:test": "MIGRATE_URL=\"$(grep ^TEST_DATABASE_URL= .env.local | cut -d= -f2-)\" drizzle-kit migrate",
     "test:db": "tsx --env-file=.env.local scripts/db-integration.ts"

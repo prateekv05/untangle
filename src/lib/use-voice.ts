@@ -93,6 +93,13 @@ export function useVoice({ maxSeconds, onLimit }: { maxSeconds: number; onLimit?
     transcriber.current = null;
   }, []);
 
+  /** Back to idle: closes the permission explainer or clears an error so the user can type. */
+  const reset = useCallback(() => {
+    cancel();
+    setError(null);
+    setPhase("idle");
+  }, [cancel]);
+
   useEffect(() => {
     alive.current = true;
     return () => { alive.current = false; transcriber.current?.cancel(); transcriber.current = null; };
@@ -113,5 +120,5 @@ export function useVoice({ maxSeconds, onLimit }: { maxSeconds: number; onLimit?
     return () => clearInterval(timer);
   }, [phase, maxSeconds, finish]);
 
-  return { phase, text, levels, seconds, error, begin, start, finish, cancel };
+  return { phase, text, levels, seconds, error, begin, start, finish, cancel, reset };
 }

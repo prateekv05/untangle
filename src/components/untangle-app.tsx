@@ -18,7 +18,6 @@ import { useDraftSave } from "@/lib/use-draft-save";
 import { useOnline } from "@/lib/use-online";
 import type { Where } from "@/lib/where";
 import { DumpScreen } from "./screens/dump-screen";
-import { ListeningScreen } from "./screens/listening-screen";
 import { PlanScreen } from "./screens/plan-screen";
 import { ThinkingScreen, thinkingSteps } from "./screens/thinking-screen";
 import { UnderstandScreen } from "./screens/understand-screen";
@@ -45,8 +44,6 @@ const EXAMPLES = [
  * Every screen as one client state machine (src/lib/flow.ts). Understanding runs on the real model (/api/understand);
  * planning still runs on fixtures until Phase 5; settings and presets are the signed-in account's own and are saved through /api.
  */
-/** What was said joins whatever was already typed in the box, within the 4,000 character cap. */
-const withHeard = (typed: string, heard: string) => `${typed.trim() ? `${typed.trim()}\n` : ""}${heard}`.slice(0, 4000);
 
 export function UntangleApp({ name = null }: { name?: string | null }) {
   const [s, dispatch] = useReducer(reducer, undefined, () => {
@@ -333,14 +330,6 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   let screen;
   if (!booted) {
     screen = <BootSkeleton />;
-  } else if (s.screen === "listening") {
-    screen = (
-      <ListeningScreen
-        onClose={() => dispatch({ type: "screen", screen: "dump" })}
-        onDone={(heard) => startUnderstand(withHeard(s.text, heard))}
-        onLimit={(heard) => { startUnderstand(withHeard(s.text, heard)); dispatch({ type: "toast", text: "That's the limit. I'm working with what I heard." }); }}
-      />
-    );
   } else if (s.screen === "thinking") {
     const preview = s.thinking === "dump" ? [] : s.tasks;
     const { title, steps } = thinkingSteps(s.thinking, preview, countThings(s.text), s.mode, s.settings, toHHMM(now()));
@@ -382,7 +371,6 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
     screen = (
       <DumpScreen
         text={s.text} onText={(text) => dispatch({ type: "text", text })}
-        onMic={() => dispatch({ type: "screen", screen: "listening" })}
         onSubmit={submitDump} onSettings={openSettings}
         onYours={() => dispatch({ type: "sheet", sheet: { type: "presets" } })}
         presets={s.presets} notice={notice?.text} onRetry={notice?.retry ? submitDump : undefined} name={name} offline={offline}

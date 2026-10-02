@@ -7,18 +7,23 @@ test.use(FAKE_MIC);
 const SAID = ["Okay, tomorrow I need to finish my SQL assignment,", "I have to go grocery shopping,", "and call my mom,", "and I want to go to the gym"];
 
 test.describe("with a microphone", () => {
-  test("web speech: live words, planning chip, chips, Done sends the text to understand", async ({ page }) => {
+  test("web speech: live words land in the box on the same page, and Done does not send them", async ({ page }) => {
     await fakeSpeech(page, SAID);
+    let understands = 0;
+    await page.route("**/api/understand", async (route) => { understands += 1; await route.fallback(); });
     await openDump(page);
+    const box = page.getByRole("textbox", { name: "What's on your mind?" });
     await page.getByRole("button", { name: "Tap to talk" }).click();
-    await expect(page.getByText("Planning for tomorrow,")).toBeVisible();
-    await expect(page.getByRole("listitem").filter({ hasText: "Finish my SQL assignment" })).toBeVisible();
-    await expect(page.getByRole("listitem").filter({ hasText: "Go grocery shopping" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Listening" })).toBeVisible();
+    await expect(box).toHaveValue(/grocery shopping/, { timeout: 5000 });
     await expect(page.getByLabel("Done talking")).toBeEnabled();
     await page.waitForTimeout(2000); // the last phrase lands
+    await page.getByRole("button", { name: "Done talking" }).click();
+    await expect(box).toHaveValue(/I want to go to the gym/);
+    expect(understands).toBe(0);
     let sent = "";
     await page.route("**/api/understand", async (route) => { sent = (route.request().postDataJSON() as { text: string }).text; await route.fallback(); });
-    await page.getByRole("button", { name: "Done talking" }).click();
+    await page.getByRole("button", { name: "Untangle my day" }).click();
     await page.getByRole("heading", { name: "Here's what I understood" }).waitFor({ timeout: 15_000 });
     expect(sent).toContain("I want to go to the gym");
   });
@@ -33,9 +38,11 @@ test.describe("with a microphone", () => {
     });
     await openDump(page);
     await page.getByRole("button", { name: "Tap to talk" }).click();
-    await expect(page.getByText("Listening", { exact: true }).nth(1)).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Listening" })).toBeVisible();
     await page.waitForTimeout(1500);
     await page.getByRole("button", { name: "Done talking" }).click();
+    await expect(page.getByRole("textbox", { name: "What's on your mind?" })).toHaveValue("SQL assignment, gym, groceries, call mom");
+    await page.getByRole("button", { name: "Untangle my day" }).click();
     await page.getByRole("heading", { name: "Here's what I understood" }).waitFor({ timeout: 15_000 });
     expect(upload!.type).toMatch(/^multipart\/form-data/);
     expect(upload!.body).toContain('name="audio"');
@@ -53,8 +60,6 @@ test.describe("with a microphone", () => {
     await expect(page.getByText("I didn't catch anything. Try again, or type it.")).toBeVisible();
     await page.getByRole("button", { name: "Try again" }).click();
     await expect(page.getByRole("button", { name: "Done talking" })).toBeEnabled();
-    await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page.getByRole("textbox", { name: "What's on your mind?" })).toBeVisible();
   });
 
   test("the daily limit and a server failure are plain messages", async ({ page }) => {
@@ -65,7 +70,6 @@ test.describe("with a microphone", () => {
     await page.waitForTimeout(1200);
     await page.getByRole("button", { name: "Done talking" }).click();
     await expect(page.getByText("That's today's limit for voice. You can still type.")).toBeVisible();
-    await page.getByRole("button", { name: "Type instead" }).click();
     await expect(page.getByRole("textbox", { name: "What's on your mind?" })).toBeVisible();
   });
 
@@ -97,6 +101,7 @@ test.describe("permission", () => {
     await expect(page.getByText("Untangle needs your microphone to hear you.")).toBeVisible();
     await page.getByRole("button", { name: "Allow microphone" }).click();
     await expect(page.getByText("Microphone is blocked. You can still type.")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "What's on your mind?" })).toBeVisible();
   });
 
   test("a blocked microphone falls back to typing", async ({ page }) => {
@@ -104,7 +109,6 @@ test.describe("permission", () => {
     await openDump(page);
     await page.getByRole("button", { name: "Tap to talk" }).click();
     await expect(page.getByText("Microphone is blocked. You can still type.")).toBeVisible();
-    await page.getByRole("button", { name: "Type instead" }).click();
     const box = page.getByRole("textbox", { name: "What's on your mind?" });
     await box.fill("call mom");
     await expect(page.getByRole("button", { name: "Untangle my day" })).toBeEnabled();

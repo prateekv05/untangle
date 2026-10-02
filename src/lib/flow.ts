@@ -11,7 +11,7 @@ import { nextLocalId, type DraftPayload } from "./draft";
 import type { DayView, ReplanView } from "./day-response";
 import { fmtDuration, toHHMM } from "./time";
 
-export type Screen = "dump" | "listening" | "thinking" | "understand" | "plan";
+export type Screen = "dump" | "thinking" | "understand" | "plan";
 export type ThinkingKind = "dump" | "plan" | "replan";
 export type SheetState =
   | null

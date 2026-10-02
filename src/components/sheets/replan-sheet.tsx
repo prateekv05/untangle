@@ -61,7 +61,7 @@ export function ReplanSheet({ nowMin, openTasks, startWithMic, onSubmit, onClose
     <Sheet title="What changed?" voice={`It's ${toHHMM(nowMin)}. Tell me, and I'll rebuild what's left of your day.`} onClose={onClose} tall>
       <div className="flex min-h-[112px] items-end gap-3 rounded-md border border-line bg-surface-soft py-3.5 pl-4 pr-3.5">
         <label htmlFor={`${id}-t`} className="sr-only">What changed?</label>
-        <textarea id={`${id}-t`} value={shown} onChange={(e) => setText(e.target.value.slice(0, 4000))} rows={3} placeholder="I didn't finish SQL and I have a meeting at 2" className="min-h-[84px] flex-1 resize-none border-0 bg-transparent p-0 text-lg leading-[27px] outline-none placeholder:text-ink-muted" />
+        <textarea id={`${id}-t`} value={shown} onChange={(e) => setText(e.target.value.slice(0, 4000))} rows={3} placeholder="I didn't finish the report and I have a client call at 2" className="min-h-[84px] flex-1 resize-none border-0 bg-transparent p-0 text-lg leading-[27px] outline-none placeholder:text-ink-muted" />
         <button type="button" aria-label={listening ? "Listening" : "Talk"} aria-pressed={listening} onClick={() => void talk()} className="grid size-14 flex-none place-items-center rounded-full border-0 bg-ink text-ink-inverse">
           <Icon name="mic" size={26} />
         </button>

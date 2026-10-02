@@ -74,7 +74,7 @@ for (const scheme of ["light", "dark"] as const) {
     await fakeSpeech(page, ["Okay, tomorrow I need to finish my SQL assignment,", "I have to go grocery shopping,", "and call my mom,"]);
     await page.goto("/");
     await page.getByRole("button", { name: "Tap to talk" }).click();
-    await page.getByText("Three things so far.").waitFor();
+    await page.getByRole("status").filter({ hasText: "Listening" }).waitFor();
     await axe(page, "listening");
     await page.goto("/dev/gallery");
     await axe(page, "gallery", { sizes: false }); // a dev-only page that shows components at every size

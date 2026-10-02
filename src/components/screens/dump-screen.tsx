@@ -1,15 +1,24 @@
 "use client";
 
-import { useId, useRef } from "react";
+import { useId, useRef, useState } from "react";
 import type { DraftPayload } from "@/lib/draft";
 import { BUILT_IN_PRESETS, countThings, type Preset } from "@/lib/guess";
+import { VOICE_PROBLEM } from "@/lib/stt/copy";
+import { useVoice } from "@/lib/use-voice";
 import { Button } from "../button";
 import { Chip } from "../chip";
 import { Icon } from "../icon";
+import { Sheet } from "../sheet";
 import { TopBar } from "../top-bar";
+import { Waveform } from "../waveform";
 
 const QUICK = ["Call", "Buy", "Go to", "Order", "Email"].map((n) => BUILT_IN_PRESETS.find((p) => p.phrase === n)!);
-const PLACEHOLDER = "SQL assignment, gym, groceries, call Mom, send resume to Sarah, work on my app, buy toothpaste…";
+const PLACEHOLDER = "Finish the Q3 report, reply to Priya, prep for the 2pm client call, gym, groceries, call Mom, book the dentist…";
+
+export const VOICE_LIMIT_SECONDS = 120;
+const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+/** What was said joins whatever was already typed, within the 4,000 character cap. */
+const joinHeard = (typed: string, heard: string) => `${typed.trim() ? `${typed.trim()}\n` : ""}${heard}`.slice(0, 4000);
 
 export const countLabel = (n: number): string => (n === 0 ? "Nothing yet" : n === 1 ? "1 thing so far" : `${n} things so far`);
 
@@ -18,14 +27,33 @@ const draftSummary = (d: DraftPayload): string => {
   return `I kept ${n === 1 ? "1 thing" : `${n} things`} for you, right where you stopped.`;
 };
 
-export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours, presets, carried = [], onCarry, draft = null, onContinueDraft, onDiscardDraft, notice, onRetry, examples, onExample, name, offline }: {
-  text: string; onText: (t: string) => void; onMic: () => void; onSubmit: () => void; onSettings: () => void; onYours: () => void;
+export function DumpScreen({ text, onText, onSubmit, onSettings, onYours, presets, carried = [], onCarry, draft = null, onContinueDraft, onDiscardDraft, notice, onRetry, examples, onExample, name, offline }: {
+  text: string; onText: (t: string) => void; onSubmit: () => void; onSettings: () => void; onYours: () => void;
   presets: Preset[]; carried?: string[]; onCarry?: (title: string) => void; draft?: DraftPayload | null; onContinueDraft?: () => void; onDiscardDraft?: () => void; notice?: string | null; onRetry?: () => void;
   examples?: { label: string; text: string }[]; onExample?: (text: string) => void; name?: string | null; offline?: boolean;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const noticeId = useId();
-  const n = countThings(text);
+
+  // Dictation happens right here: the words land in the box (never sent for the user), where they can be edited before "Untangle my day".
+  const [base, setBase] = useState("");
+  const [limited, setLimited] = useState(false);
+  const voice = useVoice({ maxSeconds: VOICE_LIMIT_SECONDS, onLimit: (final) => { onText(joinHeard(base, final)); setLimited(true); } });
+  const { phase, begin, start, finish } = voice;
+  const listening = phase === "listening";
+  const recording = listening || phase === "starting" || phase === "processing";
+  const shown = listening ? joinHeard(base, voice.text) : text;
+  const talk = async () => {
+    if (listening) {
+      const final = await finish();
+      if (final) onText(joinHeard(base, final));
+      return;
+    }
+    setLimited(false);
+    setBase(text);
+    await begin();
+  };
+  const n = countThings(shown);
   const insert = (phrase: string) => {
     onText(text.trim() ? `${text.replace(/\s+$/, "")}\n${phrase} ` : `${phrase} `);
     requestAnimationFrame(() => { const a = area.current; if (a) { a.focus(); a.setSelectionRange(a.value.length, a.value.length); } });
@@ -60,18 +88,40 @@ export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours,
             ref={area}
             aria-labelledby="dump-heading"
             aria-describedby={notice ? noticeId : undefined}
-            value={text}
+            value={shown}
+            readOnly={recording}
             onChange={(e) => onText(e.target.value.slice(0, 4000))}
             placeholder={PLACEHOLDER}
             className="min-h-0 w-full flex-1 resize-none border-0 bg-transparent p-0 text-xl leading-[30px] outline-none placeholder:text-ink-muted"
           />
-          <div className="flex items-center justify-between">
-            <span aria-live="polite" className="text-[13px] font-medium leading-[18px] text-ink-muted">{countLabel(n)}</span>
-            <button type="button" aria-label="Tap to talk" disabled={offline} onClick={onMic} className="grid size-[68px] place-items-center rounded-full border-0 bg-ink text-ink-inverse">
-              <Icon name="mic" size={30} />
+          <div className="flex items-center justify-between gap-3">
+            {recording ? (
+              <div role="status" className="min-w-0 flex-1 text-center">
+                <p className="m-0 text-[13px] font-semibold leading-[18px] text-ink-muted">
+                  {phase === "processing" ? "Turning your voice into text." : <>Listening <span className="tabular-nums" aria-label={`${voice.seconds} seconds`}>{fmtClock(voice.seconds)}</span></>}
+                </p>
+                <Waveform compact levels={listening ? voice.levels : undefined} active={phase !== "processing"} />
+              </div>
+            ) : (
+              <span aria-live="polite" className="text-[13px] font-medium leading-[18px] text-ink-muted">{countLabel(n)}</span>
+            )}
+            <button
+              type="button"
+              aria-label={listening ? "Done talking" : "Tap to talk"}
+              disabled={offline || phase === "starting" || phase === "processing"}
+              onClick={() => void talk()}
+              className="grid size-[68px] shrink-0 place-items-center rounded-full border-0 bg-ink text-ink-inverse disabled:opacity-40"
+            >
+              {recording ? <span className="block size-6 rounded-md bg-ink-inverse" aria-hidden="true" /> : <Icon name="mic" size={30} />}
             </button>
           </div>
         </div>
+        {(voice.error || limited) && (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p role="alert" className="m-0 text-sm font-medium text-danger">{voice.error ? VOICE_PROBLEM[voice.error] : "That's the limit. I kept what I heard."}</p>
+            {(voice.error === "empty" || voice.error === "failed") && <Button variant="quiet" disabled={offline} onClick={() => void talk()}>Try again</Button>}
+          </div>
+        )}
         {notice && (
           <div className="mt-2 flex items-center justify-between gap-2">
             <p id={noticeId} role="status" className="m-0 text-sm font-medium text-danger">{notice}</p>
@@ -89,9 +139,17 @@ export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours,
           </div>
         )}
         <div className="mt-auto pb-8 pt-6">
-          <Button disabled={n < 1 || offline} onClick={onSubmit}>Untangle my day</Button>
+          <Button disabled={n < 1 || offline || recording} onClick={onSubmit}>Untangle my day</Button>
         </div>
       </main>
+      {phase === "ask" && (
+        <Sheet title="Allow the microphone?" voice="Untangle needs your microphone to hear you." onClose={voice.reset}>
+          <div className="flex flex-col gap-3">
+            <Button icon="mic" onClick={() => void start()}>Allow microphone</Button>
+            <Button variant="secondary" onClick={voice.reset}>Type instead</Button>
+          </div>
+        </Sheet>
+      )}
     </div>
   );
 }

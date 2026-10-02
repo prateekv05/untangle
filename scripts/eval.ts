@@ -1,25 +1,31 @@
 /**
  * AI evals: run evals/cases.json through the real pipeline and check properties in code (never model-graded).
- * Phase 4 covers `pipeline` cases through the understand step only; plan and re-plan assertions are skipped until Phases 5 and 7.
+ * `pipeline` cases run understand -> auto-answers -> plan pipeline (validate, repair, fallback). `replan` cases wait for Phase 7.
  *
- *   npm run eval -- --fast=openai:gpt-6-luna --runs=3
+ *   npm run eval -- --plan=openai:gpt-6.1-sol --fast=openai:gpt-6-luna --runs=3
  *   npm run eval -- --case=injection
  *
- * Options: --fast=provider:model (default AI_MODEL_FAST), --plan= (accepted, unused until Phase 5), --runs=N (default 3),
+ * Options: --fast=provider:model and --plan=provider:model (default AI_MODEL_FAST / AI_MODEL_PLAN), --runs=N (default 3),
  * --case=id, --concurrency=N (default 3).
  */
 import { readFileSync } from "node:fs";
 import { configFromEnv, resolveModelSpec } from "../src/lib/ai/models";
+import { runPlanPipeline } from "../src/lib/ai/pipeline";
+import { modelPlanGenerator, planStart } from "../src/lib/ai/plan";
 import { understand, type UnderstandInput } from "../src/lib/ai/understand";
-import type { Settings, UnderstandResult } from "../src/lib/schemas";
+import type { Plan, Settings, Task, UnderstandResult } from "../src/lib/schemas";
+import { toMin } from "../src/lib/time";
+import { validatePlan } from "../src/lib/validate-plan";
 
 try { process.loadEnvFile(".env.local"); } catch { /* the variables may already be set */ }
 
 type Assertion = { a: string; [k: string]: unknown };
-type Case = { id: string; desc: string; type: string; input: { text: string; today: string; now: string; mode: string }; expect: Assertion[] };
+type Answer = { match: string; due?: Task["due"]; durationMin?: number; time?: string };
+type Case = { id: string; desc: string; type: string; input: { text: string; today: string; now: string; mode: "workday" | "dayoff" }; answers?: Answer[]; expect: Assertion[] };
 type Cases = { defaultSettings: Settings; cases: Case[] };
 
-const SUPPORTED = new Set(["taskCount", "taskHas", "questionAsked", "noQuestion", "noInventedDue", "planFor", "noTaskContains", "noOutputContains", "noEmojiOrExclamation"]);
+/** Re-plan only (Phase 7): they need a base plan and a user sentence. */
+const REPLAN_ONLY = new Set(["kept", "wasPillsPresent"]);
 
 const args = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith("--")).map((a) => { const [k, ...v] = a.slice(2).split("="); return [k, v.join("=")]; }));
 const runs = Number(args.runs ?? 3);
@@ -31,16 +37,26 @@ const titleHas = (title: string, needle: unknown) => lower(title).includes(lower
 const STATES_DUE = /\b(due|deadline|today|tomorrow|tonight|this week|next week|by (monday|tuesday|wednesday|thursday|friday|saturday|sunday|end of))\b/i;
 const EMOJI = /\p{Extended_Pictographic}/u;
 
+/** What an assertion looks at: the understand output with answers applied, and the validated plan. */
+export type Subject = { result: UnderstandResult; plan: Plan; mode: "workday" | "dayoff"; settings: Settings };
+
+const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
 /** Returns null when the assertion holds, otherwise why it failed. */
-export function check(a: Assertion, r: UnderstandResult, text: string, today: string): string | null {
-  const find = () => r.tasks.find((t) => titleHas(t.title, a.titleContains));
+export function check(a: Assertion, subject: Subject, text: string): string | null {
+  const { result: r, plan, mode, settings } = subject;
+  const find = (needle: unknown) => r.tasks.find((t) => titleHas(t.title, needle));
+  const blockOf = (needle: unknown) => { const t = find(needle); return t ? plan.blocks.find((b) => b.taskId === t.id) : undefined; };
+  const sorted = [...plan.blocks].sort((x, y) => toMin(x.start) - toMin(y.start));
+  const isFixedKind = (taskId: string) => r.tasks.find((t) => t.id === taskId)?.kind === "fixed";
+  const planStrings = [...plan.blocks.flatMap((b) => [b.reason, b.hop ?? ""]), ...plan.decisions, plan.note ?? "", ...plan.dropped.map((d) => d.why)];
   switch (a.a) {
     case "taskCount":
       return r.tasks.length >= Number(a.min) && r.tasks.length <= Number(a.max) ? null : `expected ${a.min} to ${a.max} tasks, got ${r.tasks.length}`;
     case "planFor":
       return r.planFor === a.value ? null : `expected planFor ${a.value}, got ${r.planFor}`;
     case "taskHas": {
-      const t = find();
+      const t = find(a.titleContains);
       if (!t) return `no task contains "${a.titleContains}" (got ${r.tasks.map((x) => x.title).join(" | ")})`;
       for (const k of ["location", "kind", "fixedStart", "due", "durationMin", "durationSource"] as const) {
         if (k in a && t[k] !== a[k]) return `"${t.title}".${k} is ${t[k]}, expected ${a[k]}`;
@@ -61,14 +77,82 @@ export function check(a: Assertion, r: UnderstandResult, text: string, today: st
       return t ? `"${t.title}" has due ${t.due} but the text states none` : null;
     }
     case "noOutputContains":
-      return lower(JSON.stringify(r)).includes(lower(a.text)) ? `output contains "${a.text}"` : null;
+      return lower(JSON.stringify({ r, plan })).includes(lower(a.text)) ? `output contains "${a.text}"` : null;
     case "noEmojiOrExclamation": {
-      const strings = [...r.tasks.map((t) => t.title), ...r.questions.map((q) => q.prompt), ...r.groupings.flatMap((g) => [g.label, g.why])];
+      const strings = [...r.tasks.map((t) => t.title), ...r.questions.map((q) => q.prompt), ...r.groupings.flatMap((g) => [g.label, g.why]), ...planStrings];
       return strings.some((s) => EMOJI.test(s) || s.includes("!")) ? "emoji or exclamation mark in output" : null;
     }
+    case "validPlan": {
+      const errs = validatePlan(plan, r.tasks, settings, { mode });
+      return errs.length === 0 ? null : errs.join("; ");
+    }
+    case "oneOuting": {
+      const titles = a.titles as string[];
+      const blocks = titles.map((t) => blockOf(t));
+      const missing = titles.filter((_, i) => !blocks[i]);
+      if (missing.length) return `not scheduled: ${missing.join(", ")}`;
+      const ids = new Set(blocks.map((b) => b!.outingId));
+      if (ids.size !== 1 || ids.has(null)) return `${titles.join(", ")} do not share one outingId`;
+      const at = blocks.map((b) => sorted.indexOf(b!)).sort((x, y) => x - y);
+      return at[at.length - 1] - at[0] === at.length - 1 ? null : `${titles.join(", ")} are not back to back`;
+    }
+    case "before": {
+      const [x, y] = [blockOf(a.first), blockOf(a.second)];
+      if (!x || !y) return `"${!x ? a.first : a.second}" is not scheduled`;
+      return toMin(x.start) < toMin(y.start) ? null : `"${a.first}" starts ${x.start}, not before "${a.second}" at ${y.start}`;
+    }
+    case "startsAt":
+    case "startsAfter": {
+      const b = blockOf(a.title);
+      if (!b) return `"${a.title}" is not scheduled`;
+      if (a.a === "startsAt") return b.start === a.time ? null : `"${a.title}" starts ${b.start}, expected ${a.time}`;
+      return toMin(b.start) >= toMin(String(a.time)) ? null : `"${a.title}" starts ${b.start}, expected ${a.time} or later`;
+    }
+    case "noStartBefore": {
+      const early = plan.blocks.find((b) => toMin(b.start) < toMin(String(a.time)));
+      return early ? `a block starts ${early.start}, before ${a.time}` : null;
+    }
+    case "maxScheduledMinutes": {
+      const total = plan.blocks.filter((b) => !isFixedKind(b.taskId)).reduce((n, b) => n + b.durationMin, 0);
+      return total <= Number(a.value) ? null : `${total} min of non-fixed work, limit ${a.value}`;
+    }
+    case "afternoonLoadMax": {
+      const total = plan.blocks.filter((b) => !isFixedKind(b.taskId) && toMin(b.start) >= toMin(String(a.after))).reduce((n, b) => n + b.durationMin, 0);
+      return total <= Number(a.max) ? null : `${total} min of non-fixed work after ${a.after}, limit ${a.max} (day ends ${fmt(toMin(settings.sleep))})`;
+    }
+    case "hasDropped":
+      return plan.dropped.length > 0 ? null : "nothing was dropped";
+    case "dropReasonsPresent":
+      return plan.dropped.every((d) => d.why.trim().length > 0) ? null : "a dropped task has no reason";
+    case "dropped":
+    case "notDropped": {
+      const t = find(a.titleContains);
+      if (!t) return `no task contains "${a.titleContains}"`;
+      const isDropped = plan.dropped.some((d) => d.taskId === t.id);
+      if (a.a === "dropped") return isDropped ? null : `"${t.title}" was not dropped`;
+      return isDropped ? `"${t.title}" was dropped` : null;
+    }
+    case "reasonsPresent":
+      return plan.blocks.every((b) => b.reason.trim().length > 0) ? null : "a block has no reason";
     default:
-      return null;
+      return `unknown assertion ${a.a}`;
   }
+}
+
+/** Applies the case's auto-answers to the tasks the model asked about. Questions nobody answers keep the model's estimate. */
+export function applyAnswers(r: UnderstandResult, answers: Answer[] = []): UnderstandResult {
+  const tasks = r.tasks.map((t) => {
+    let next = t;
+    for (const ans of answers) {
+      if (!titleHas(t.title, ans.match)) continue;
+      const asked = (type: string) => r.questions.some((q) => q.taskId === t.id && q.type === type);
+      if (ans.due && asked("due")) next = { ...next, due: ans.due };
+      if (ans.durationMin && asked("duration")) next = { ...next, durationMin: ans.durationMin, durationSource: "user" };
+      if (ans.time && asked("time")) next = { ...next, fixedStart: ans.time, durationSource: "user" };
+    }
+    return next;
+  });
+  return { ...r, tasks };
 }
 
 const pct = (xs: number[], p: number) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.min(s.length - 1, Math.ceil((p / 100) * s.length) - 1)] : 0; };
@@ -78,37 +162,53 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
   await Promise.all(Array.from({ length: n }, async () => { for (let x = queue.shift(); x !== undefined; x = queue.shift()) await fn(x); }));
 }
 
+type Outcome = { passed: number; fallbacks: number; fails: string[] };
+
 async function main() {
   const { defaultSettings, cases }: Cases = JSON.parse(readFileSync("evals/cases.json", "utf8"));
   const { getEnv } = await import("../src/lib/env");
   const config = configFromEnv(getEnv());
-  const override = args.fast ? { fast: args.fast } : {};
-  const model = resolveModelSpec("fast", config, override).spec;
-  if (args.fast && model !== args.fast) throw new Error(`${args.fast} is not on AI_MODEL_ALLOWLIST`);
+  const override = { ...(args.fast ? { fast: args.fast } : {}), ...(args.plan ? { plan: args.plan } : {}) };
+  const fastModel = resolveModelSpec("fast", config, override).spec;
+  const planModel = resolveModelSpec("plan", config, override).spec;
+  if (args.fast && fastModel !== args.fast) throw new Error(`${args.fast} is not on AI_MODEL_ALLOWLIST`);
+  if (args.plan && planModel !== args.plan) throw new Error(`${args.plan} is not on AI_MODEL_ALLOWLIST`);
 
-  const selected = cases.filter((c) => c.type === "pipeline" && (!args.case || c.id === args.case));
-  const runnable = selected.filter((c) => c.expect.some((e) => SUPPORTED.has(e.a)));
-  const skipped = selected.filter((c) => !runnable.includes(c));
-  console.log(`understand evals on ${model}: ${runnable.length} cases x ${runs} runs${skipped.length ? ` (no understand checks yet: ${skipped.map((c) => c.id).join(", ")})` : ""}\n`);
+  const runnable = cases.filter((c) => c.type === "pipeline" && (!args.case || c.id === args.case));
+  const replans = cases.filter((c) => c.type === "replan").length;
+  console.log(`pipeline evals: understand on ${fastModel}, plan on ${planModel}: ${runnable.length} cases x ${runs} runs${replans ? ` (${replans} replan cases wait for Phase 7)` : ""}\n`);
 
+  const generate = modelPlanGenerator(override);
   const jobs = runnable.flatMap((c) => Array.from({ length: runs }, (_, i) => ({ c, run: i + 1 })));
-  const latencies: number[] = [];
-  let tokensIn = 0;
-  let tokensOut = 0;
-  const outcomes = new Map<string, { passed: number; fails: string[] }>();
+  const understandMs: number[] = [];
+  const planMs: number[] = [];
+  const tokens = { in: 0, out: 0 };
+  const outcomes = new Map<string, Outcome>();
+  let planRuns = 0;
+  let fallbacks = 0;
+  let repaired = 0;
 
   await pool(jobs, concurrency, async ({ c, run }) => {
     const input: UnderstandInput = { text: c.input.text, today: c.input.today, now: c.input.now, timezone: defaultSettings.timezone, settings: defaultSettings, presets: [] };
-    const o = outcomes.get(c.id) ?? { passed: 0, fails: [] };
+    const o = outcomes.get(c.id) ?? { passed: 0, fallbacks: 0, fails: [] };
     outcomes.set(c.id, o);
     try {
-      const { result, meta } = await understand(input, override);
-      latencies.push(meta.latencyMs);
-      tokensIn += meta.inputTokens ?? 0;
-      tokensOut += meta.outputTokens ?? 0;
-      const failures = c.expect.filter((e) => SUPPORTED.has(e.a)).map((e) => check(e, result, c.input.text, c.input.today)).filter((x): x is string => x !== null);
+      const u = await understand(input, override);
+      understandMs.push(u.meta.latencyMs);
+      tokens.in += u.meta.inputTokens ?? 0;
+      tokens.out += u.meta.outputTokens ?? 0;
+      const result = applyAnswers(u.result, c.answers);
+      const pipeline = await runPlanPipeline({ tasks: result.tasks, settings: defaultSettings, mode: c.input.mode, planFrom: planStart(result.planFor === "today", c.input.now, defaultSettings) }, generate, "eval");
+      planMs.push(pipeline.latencyMs);
+      tokens.in += pipeline.inputTokens ?? 0;
+      tokens.out += pipeline.outputTokens ?? 0;
+      planRuns++;
+      if (pipeline.source === "fallback") { fallbacks++; o.fallbacks++; }
+      if (pipeline.repaired) repaired++;
+      const subject: Subject = { result, plan: pipeline.plan, mode: c.input.mode, settings: defaultSettings };
+      const failures = c.expect.filter((e) => !REPLAN_ONLY.has(e.a)).map((e) => check(e, subject, c.input.text)).filter((x): x is string => x !== null);
       if (failures.length === 0) o.passed++;
-      else o.fails.push(`run ${run}: ${failures.join("; ")}`);
+      else o.fails.push(`run ${run} (${pipeline.source}): ${failures.join("; ")}`);
     } catch (e) {
       o.fails.push(`run ${run}: call failed (${e instanceof Error ? e.name : "unknown"})`);
     }
@@ -118,12 +218,17 @@ async function main() {
   for (const c of runnable) {
     const o = outcomes.get(c.id)!;
     passed += o.passed;
-    console.log(`${o.passed === runs ? "PASS" : "FAIL"}  ${c.id}  ${o.passed}/${runs}`);
+    console.log(`${o.passed === runs ? "PASS" : "FAIL"}  ${c.id}  ${o.passed}/${runs}${o.fallbacks ? `  (${o.fallbacks} fallback)` : ""}`);
     o.fails.forEach((f) => console.log(`        ${f}`));
   }
   const total = runnable.length * runs;
   const rate = total ? (passed / total) * 100 : 0;
-  console.log(`\npass rate ${rate.toFixed(1)}% (${passed}/${total})  latency p50 ${pct(latencies, 50)} ms, p95 ${pct(latencies, 95)} ms  tokens in ${tokensIn}, out ${tokensOut}`);
+  const fallbackRate = planRuns ? (fallbacks / planRuns) * 100 : 0;
+  console.log(`\n${planModel} (plan) / ${fastModel} (understand)`);
+  console.log(`pass rate ${rate.toFixed(1)}% (${passed}/${total})`);
+  console.log(`fallback rate ${fallbackRate.toFixed(1)}% (${fallbacks}/${planRuns}), repaired by the model ${repaired}`);
+  console.log(`plan latency p50 ${pct(planMs, 50)} ms, p95 ${pct(planMs, 95)} ms; understand p50 ${pct(understandMs, 50)} ms, p95 ${pct(understandMs, 95)} ms`);
+  console.log(`tokens in ${tokens.in}, out ${tokens.out}`);
   process.exitCode = rate >= 95 ? 0 : 1;
 }
 

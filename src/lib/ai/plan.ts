@@ -5,7 +5,7 @@ import { generateText, Output } from "ai";
 import { callSettings, getModel, type ModelOverride } from "./models";
 import { loadPrompt } from "./prompts";
 import { Plan, type Settings, type Task } from "../schemas";
-import { toHHMM } from "../time";
+import { toHHMM, toMin } from "../time";
 import type { PlanMode } from "../planner";
 
 export type PlanInput = {
@@ -15,6 +15,10 @@ export type PlanInput = {
   /** Minutes since midnight: nothing may start earlier. */
   planFrom: number;
 };
+
+/** Where a plan starts: today from now (rounded up to 5, not before waking), another day an hour after waking. */
+export const planStart = (isToday: boolean, now: string, settings: Settings): number =>
+  isToday ? Math.max(Math.ceil(toMin(now) / 5) * 5, toMin(settings.wake)) : toMin(settings.wake) + 60;
 
 export type PlanRepair = { previous: Plan; errors: string[] };
 

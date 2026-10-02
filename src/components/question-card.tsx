@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Question } from "@/lib/schemas";
 import { fmtDuration } from "@/lib/time";
 import { Chip } from "./chip";
+import { MinutesInput } from "./minutes-input";
 
 const DUE_LABEL = { today: "Today", tomorrow: "Tomorrow", week: "This week", none: "No deadline" } as const;
 const HEADING = ["", "One quick question", "Two quick questions", "Three quick questions"];
@@ -27,6 +28,7 @@ export function QuestionCard({ questions, onAnswer }: { questions: Question[]; o
             <div className="flex flex-wrap gap-2">
               {q.optionsMin.map((m) => <Chip key={m} onClick={() => onAnswer(q, m)}>{fmtDuration(m)}</Chip>)}
               <Chip onClick={() => onAnswer(q, null)}>Not sure</Chip>
+              <MinutesInput onSet={(m) => onAnswer(q, m)} />
             </div>
           )}
           {q.type === "time" && <TimeAnswer onSet={(v) => onAnswer(q, v)} onSkip={() => onAnswer(q, null)} label={q.prompt} />}

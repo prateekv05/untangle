@@ -8,6 +8,7 @@ import { fmtDuration } from "@/lib/time";
 import { WHERE, WHERE_ORDER, type Where } from "@/lib/where";
 import { Chip } from "./chip";
 import { Icon } from "./icon";
+import { MinutesInput } from "./minutes-input";
 import { FactPill, TimeChip, WhereTag } from "./where-tag";
 
 export const DURATION_CHOICES = [15, 30, 45, 60, 90, 120];
@@ -53,6 +54,7 @@ export function UnderstandRow({ task, onRemove, onWhere, onDuration }: {
             <Chip key={m} small selected={task.durationSource !== "estimated" && m === task.durationMin} onClick={() => { onDuration(m); setMenu(null); }}>{fmtDuration(m)}</Chip>
           ))}
           <Chip small onClick={() => { onDuration(null); setMenu(null); }}>Not sure</Chip>
+          <MinutesInput small onSet={(m) => { onDuration(m); setMenu(null); }} />
         </div>
       )}
     </li>

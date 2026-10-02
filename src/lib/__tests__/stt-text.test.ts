@@ -45,3 +45,13 @@ test("audio checks: empty, too large, wrong type, too long", () => {
   assert.equal(audioProblem(ok, 126, 120), "too_long");
   assert.equal(audioProblem(ok, 124, 120), null);
 });
+
+import { isSafari } from "../stt/web-speech";
+
+test("safari is sent to the server path, chrome and android are not", () => {
+  assert.equal(isSafari("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"), true);
+  assert.equal(isSafari("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"), true);
+  assert.equal(isSafari("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"), false);
+  assert.equal(isSafari("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"), false);
+  assert.equal(isSafari("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148 Safari/604.1"), true);
+});

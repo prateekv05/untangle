@@ -8,7 +8,7 @@ export interface Transcriber {
   cancel(): void;
 }
 
-export type VoiceErrorCode = "denied" | "unsupported" | "empty" | "failed" | "limit";
+export type VoiceErrorCode = "denied" | "unsupported" | "empty" | "failed" | "daily_limit";
 
 export class VoiceError extends Error {
   constructor(public readonly code: VoiceErrorCode) {

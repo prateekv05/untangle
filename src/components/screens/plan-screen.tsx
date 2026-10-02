@@ -10,6 +10,7 @@ import { AddTaskCard } from "../add-task-card";
 import { Button } from "../button";
 import { Decisions } from "../decisions";
 import { Icon } from "../icon";
+import { InstallHint } from "../install-hint";
 import { Outing } from "../outing";
 import { TaskBlock } from "../task-block";
 import { NowMarker, ThreadHop, ThreadMarker, ThreadRow } from "../thread";
@@ -149,6 +150,7 @@ export function PlanScreen(p: {
             </ul>
           </section>
         )}
+        <InstallHint />
         <div className="mt-3.5 px-5">
           {adding ? (
             <AddTaskCard presets={p.presets} onAdd={(t) => { p.onAdd(t); setAdding(false); }} onCancel={() => setAdding(false)} />

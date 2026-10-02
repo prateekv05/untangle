@@ -48,3 +48,11 @@ Each phase prompt in `BUILD_PROMPT.md` also has a box per step and per Acceptanc
 ## Later (out of scope for v1)
 
 Calendar import, push notifications, widgets, sharing, multi-day planning, learning from history, offline write queue (stretch in Phase 9).
+
+## Phase 4 open items
+
+- [ ] Anthropic credit balance ran out mid-run. Haiku 4.5 and Sonnet 5.5 passed 21/21 on the first schema, but after the flat-question wire schema Sonnet passed 21/21 and Haiku missed the "go for a run" duration question 3/3. Re-run `npm run eval -- --fast=anthropic:claude-haiku-4-5-20251001` once credits are back and fix the prompt if it still misses.
+- [ ] Understand-stage add and remove of tasks are client-only (no POST /api/tasks, no delete). Phase 5 must sync them before planning.
+- [ ] A new dump for a date that already has a day replaces that day (one day per user per date). Revisit with carry-over in Phase 6.
+- [ ] SCREENS.md asks for a Retry button on the failure state; Phase 4 keeps the text and the main button retries.
+- [ ] p95 latency on understand is 5 to 14 s depending on model; check the thinking screen on a slow phone.

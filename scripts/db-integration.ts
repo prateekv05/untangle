@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import { makeDb } from "../src/db/client";
-import { AiLimitError, carryOver, createDayWithTasks, getDay, getSettings, getUserById, incrementAiUsage, moveTaskToLater, NotFoundError, savePlan, updateTask } from "../src/db/queries";
+import { AiLimitError, carryOver, createDayWithTasks, getDay, getSettings, getUserById, incrementAiUsage, moveTaskToLater, NotFoundError, savePlan, syncDayTasks, updateTask } from "../src/db/queries";
 import { clearAuthAttempts, clearPassword, completeOnboarding, findUserByEmail, findUserByGoogleSub, recordAuthAttempt, setPassword, upsertGoogleUser } from "../src/db/queries/account";
 import { deletePreset, listPresets, MAX_PRESETS, PresetLimitError, savePreset, saveSettings } from "../src/db/queries/presets";
 import { users } from "../src/db/schema";
@@ -56,6 +56,24 @@ try {
   await moveTaskToLater(a.id, tasks[1].id, "2026-10-02", db);
   assert.equal((await carryOver(a.id, "2026-10-02", db)).length, 1);
   assert.equal((await carryOver(a.id, "2026-10-03", db)).length, 0);
+
+  // syncDayTasks: update known ids, insert new ones, delete the missing, keep the given order
+  {
+    const d2 = await createDayWithTasks(a.id, "2026-10-05", "dayoff", "x", [
+      { title: "One", location: "anywhere", kind: "admin", durationMin: 30, durationSource: "estimated", fixedStart: null, due: null },
+      { title: "Two", location: "anywhere", kind: "admin", durationMin: 30, durationSource: "estimated", fixedStart: null, due: null },
+    ], db);
+    const [one] = d2.tasks;
+    const synced = await syncDayTasks(a.id, d2.day.id, [
+      { title: "Three", location: "home", kind: "chore", durationMin: 20, durationSource: "user", fixedStart: null, due: null },
+      { ...one, durationMin: 45, durationSource: "user" },
+    ], db);
+    assert.deepEqual(synced.map((t) => t.title), ["Three", "One"]);
+    assert.equal(synced[1].id, one.id);
+    assert.equal(synced[1].durationMin, 45);
+    assert.equal((await getDay(a.id, "2026-10-05", db))?.tasks.length, 2); // "Two" is deleted
+    await expectNotFound(syncDayTasks(b.id, d2.day.id, [], db));
+  }
 
   // isolation: user B cannot see or touch A's data
   assert.equal(await getDay(b.id, "2026-10-01", db), null);

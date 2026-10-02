@@ -70,3 +70,10 @@ test("fromWire turns the flat question shape back into the canonical union", () 
     { type: "time", taskId: "t1", prompt: "At what time?" },
   ]);
 });
+
+test("a model that asks four questions is trimmed to three, not rejected", () => {
+  const tasks = ["t1", "t2", "t3", "t4"].map((id) => task(id, { kind: "deep" }));
+  const wire = { planFor: "today" as const, tasks, groupings: [], questions: tasks.map((t) => ({ type: "due" as const, taskId: t.id, prompt: "When is it due?", options: null, optionsMin: null })) };
+  const out = sanitizeUnderstand(fromWire(wire));
+  assert.equal(out.questions.length, 3);
+});

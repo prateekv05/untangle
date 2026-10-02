@@ -7,7 +7,7 @@ import { logAiCall, type AiLog } from "./log";
 import { callSettings, getModel, type ModelOverride, type ModelRef } from "./models";
 import { loadPrompt } from "./prompts";
 import { z } from "zod";
-import { Due, UnderstandResult, type Question, type Settings, type Task } from "../schemas";
+import { Due, Question, UnderstandResult, type Settings, type Task } from "../schemas";
 
 export type UnderstandPreset = { verb: string; location: Task["location"]; kind: Task["kind"]; defaultDurationMin: number | null };
 
@@ -47,22 +47,25 @@ const WireQuestion = z.object({
   /** For "duration" questions: the choices in minutes. null otherwise. */
   optionsMin: z.array(z.number().int()).nullable(),
 });
-const WireUnderstand = UnderstandResult.extend({ questions: z.array(WireQuestion).max(3) });
+/** No cap on questions here: models overshoot, and a hard cap would throw away a good read. sanitizeUnderstand() keeps the best 3. */
+const WireUnderstand = UnderstandResult.extend({ questions: z.array(WireQuestion) });
+const RawUnderstand = UnderstandResult.extend({ questions: z.array(Question) });
+type RawUnderstand = z.infer<typeof RawUnderstand>;
 type WireUnderstand = z.infer<typeof WireUnderstand>;
 
 const DEFAULT_DUE = ["today", "tomorrow", "week", "none"] as const;
 
-export function fromWire(wire: WireUnderstand): UnderstandResult {
+export function fromWire(wire: WireUnderstand): RawUnderstand {
   const questions: Question[] = wire.questions.map((q) => {
     if (q.type === "due") return { type: "due", taskId: q.taskId, prompt: q.prompt, options: q.options?.length ? q.options : [...DEFAULT_DUE] };
     if (q.type === "duration") return { type: "duration", taskId: q.taskId, prompt: q.prompt, optionsMin: q.optionsMin?.length ? q.optionsMin : [45, 60, 90] };
     return { type: "time", taskId: q.taskId, prompt: q.prompt };
   });
-  return UnderstandResult.parse({ ...wire, questions });
+  return RawUnderstand.parse({ ...wire, questions });
 }
 
 /** Deterministic clean-up of the model's output. Pure, so it is unit-tested. */
-export function sanitizeUnderstand(raw: UnderstandResult): UnderstandResult {
+export function sanitizeUnderstand(raw: RawUnderstand): UnderstandResult {
   const seen = new Set<string>();
   const tasks = raw.tasks.filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)));
   const byId = new Map(tasks.map((t) => [t.id, t]));

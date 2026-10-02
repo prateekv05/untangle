@@ -51,6 +51,8 @@ export const understandBody = (maxChars: number) => z.object({ text: z.string().
 export const PlanBody = z
   .object({
     dayId: z.string().uuid(),
+    /** The Workday / Day off choice on Understand; it can differ from what the date suggested. */
+    mode: z.enum(["workday", "dayoff"]),
     tasks: z
       .array(
         z.object({

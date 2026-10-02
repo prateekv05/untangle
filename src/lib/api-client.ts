@@ -1,6 +1,6 @@
 /** Browser-side calls to the account routes. Each rejects on a non-2xx so callers can roll an optimistic update back. */
 import type { Preset } from "./guess";
-import type { Question, Settings, Task, UnderstandResult } from "./schemas";
+import type { Plan, Question, Settings, Task, UnderstandResult } from "./schemas";
 
 export class ApiError extends Error {
   constructor(public readonly status: number) {
@@ -43,3 +43,11 @@ export type UnderstandResponse = {
 export const postUnderstand = (text: string) => call<UnderstandResponse>("/api/understand", { method: "POST", body: JSON.stringify({ text }) });
 export const patchTask = (id: string, patch: Partial<Pick<Task, "location" | "durationMin" | "durationSource" | "fixedStart" | "due" | "title" | "kind">>) =>
   call<Task>(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+
+export type PlanResponse = { plan: Plan; tasks: Task[]; mode: "workday" | "dayoff"; source: "llm" | "fallback"; model: string | null; version: number; plannedAt: string };
+/** Saves the tasks as left on Understand and plans the day. New tasks (local ids) are sent without an id. */
+export const postPlan = (dayId: string, mode: PlanResponse["mode"], tasks: Task[]) =>
+  call<PlanResponse>("/api/plan", {
+    method: "POST",
+    body: JSON.stringify({ dayId, mode, tasks: tasks.map(({ id, ...t }) => (/^[0-9a-f-]{36}$/.test(id) ? { id, ...t } : t)) }),
+  });

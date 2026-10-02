@@ -149,3 +149,15 @@ test("optimistic preset edits: add replaces the same phrase, swap keeps order, d
   s = reducer(s, { type: "presetRestore", preset: gone }); // restoring twice does not duplicate
   assert.deepEqual(s.presets.map((p) => p.id), ["real-2"]);
 });
+
+test("planned reveals the server's plan, tasks and mode with the entrance animation", () => {
+  const before = reducer(initialState(), { type: "understood", tasks: exampleTasks(), questions: [], mode: "workday" });
+  const server = built();
+  const s = reducer(before, { type: "planned", plan: server.plan!, tasks: server.tasks, mode: "dayoff", plannedAt: "09:15" });
+  assert.equal(s.screen, "plan");
+  assert.equal(s.plan, server.plan);
+  assert.equal(s.mode, "dayoff");
+  assert.equal(s.plannedAt, "09:15");
+  assert.equal(s.entrance, true);
+  assert.deepEqual(s.done, []);
+});

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
-import { ApiError, deletePreset, getPresets, getSettings, patchTask, postPreset, postUnderstand, putSettings, type UnderstandResponse } from "@/lib/api-client";
+import { ApiError, deletePreset, getPresets, getSettings, patchTask, postPlan, postPreset, postUnderstand, putSettings, type PlanResponse, type UnderstandResponse } from "@/lib/api-client";
 import { APPOINTMENT_DUMP, EXAMPLE_DUMP } from "@/fixtures/example";
 import { interpretReplan } from "@/fixtures/replan";
 import { browserTimezone, nowMinutes } from "@/lib/clock";
@@ -156,7 +156,37 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
     dispatch({ type: "patchTask", taskId, patch: p, now: now() });
     savePatch(taskId, p);
   };
-  const finishPlanThinking = useCallback(() => dispatch({ type: "build", now: now() }), [now]);
+
+  // The plan call runs while the thinking screen plays. Nothing is shown until the server has validated the plan.
+  const planRun = useRef(0);
+  const planned = useRef<PlanResponse | null>(null);
+  const [planReady, setPlanReady] = useState(false);
+  const startPlan = () => {
+    const dayId = understood.current?.dayId;
+    if (!dayId) return;
+    const run = ++planRun.current;
+    planned.current = null;
+    setPlanReady(false);
+    dispatch({ type: "think", kind: "plan" });
+    postPlan(dayId, s.mode, s.tasks)
+      .then((res) => {
+        if (run !== planRun.current) return;
+        planned.current = res;
+        setPlanReady(true);
+      })
+      .catch((e) => {
+        if (run !== planRun.current) return;
+        dispatch({ type: "screen", screen: "understand" });
+        dispatch({ type: "toast", text: e instanceof ApiError && e.status === 429
+          ? "That's today's limit for building days. Your list is saved. Try again tomorrow."
+          : "I couldn't build your day just now. Your list is saved. Try again." });
+      });
+  };
+  const finishPlanThinking = useCallback(() => {
+    const res = planned.current;
+    if (!res) return;
+    dispatch({ type: "planned", plan: res.plan, tasks: res.tasks, mode: res.mode, plannedAt: res.plannedAt });
+  }, []);
 
   const sheet = s.sheet;
   const editTask = sheet?.type === "edit" ? s.tasks.find((t) => t.id === sheet.taskId) : undefined;
@@ -176,7 +206,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   } else if (s.screen === "thinking") {
     const preview = s.thinking === "dump" ? [] : s.tasks;
     const { title, steps } = thinkingSteps(s.thinking, preview, countThings(s.text), s.mode, s.settings);
-    screen = <ThinkingScreen key={s.thinking} title={title} steps={steps} ready={s.thinking === "dump" ? understandReady : true} onDone={s.thinking === "dump" ? finishDumpThinking : finishPlanThinking} />;
+    screen = <ThinkingScreen key={s.thinking} title={title} steps={steps} ready={s.thinking === "dump" ? understandReady : planReady} onDone={s.thinking === "dump" ? finishDumpThinking : finishPlanThinking} />;
   } else if (s.screen === "understand") {
     screen = (
       <UnderstandScreen
@@ -187,7 +217,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         onWhere={(taskId, w: Where) => patch(taskId, { location: w })}
         onDuration={(taskId, min) => patch(taskId, min === null ? { durationSource: "estimated" } : { durationMin: min, durationSource: "user" })}
         onAdd={(task) => dispatch({ type: "addTask", task, now: now() })}
-        onBuild={() => dispatch({ type: "think", kind: "plan" })}
+        onBuild={startPlan}
         onBack={() => dispatch({ type: "screen", screen: "dump" })}
         onSettings={openSettings}
       />

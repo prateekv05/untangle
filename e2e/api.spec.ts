@@ -7,6 +7,8 @@ const UUID = "00000000-0000-4000-8000-000000000000";
 const SETTINGS = { workStart: "09:00", workEnd: "17:00", workDays: [1, 2, 3, 4, 5], wake: "07:00", sleep: "23:00", timezone: "Europe/London" };
 const PRESET = { verb: "Swim", location: "outside", kind: "health", defaultDurationMin: 45 };
 
+const PLAN_TASK = { title: "x", location: "home", kind: "chore", durationMin: 30, durationSource: "user", fixedStart: null, due: null };
+
 type Route = { method: "GET" | "PUT" | "POST" | "PATCH" | "DELETE"; path: string; body?: unknown };
 const ROUTES: Route[] = [
   { method: "GET", path: "/api/me" },
@@ -21,6 +23,7 @@ const ROUTES: Route[] = [
   { method: "GET", path: "/api/day?date=2026-10-01" },
   { method: "PATCH", path: `/api/tasks/${UUID}`, body: { title: "x" } },
   { method: "POST", path: "/api/understand", body: { text: "gym" } },
+  { method: "POST", path: "/api/plan", body: { dayId: UUID, mode: "dayoff", tasks: [PLAN_TASK] } },
 ];
 
 const as = async (u: TestUser) => ({ headers: { cookie: `authjs.session-token=${await sessionCookieValue(u)}` } });
@@ -58,6 +61,10 @@ test.describe("malformed input is 400, never 500", () => {
     { method: "POST", path: "/api/understand", body: { text: "   " } },
     { method: "POST", path: "/api/understand", body: { text: "x".repeat(4001) } },
     { method: "POST", path: "/api/understand", body: { text: "gym", extra: 1 } },
+    { method: "POST", path: "/api/plan", body: { dayId: "nope", mode: "dayoff", tasks: [PLAN_TASK] } },
+    { method: "POST", path: "/api/plan", body: { dayId: UUID, mode: "dayoff", tasks: [] } },
+    { method: "POST", path: "/api/plan", body: { dayId: UUID, mode: "weekend", tasks: [PLAN_TASK] } },
+    { method: "POST", path: "/api/plan", body: { dayId: UUID, mode: "dayoff", tasks: [{ ...PLAN_TASK, durationMin: 2 }] } },
     { method: "PATCH", path: "/api/tasks/not-a-uuid", body: { title: "x" } },
     { method: "PATCH", path: `/api/tasks/${UUID}`, body: {} },
     { method: "PATCH", path: `/api/tasks/${UUID}`, body: { durationMin: -5 } },
@@ -78,6 +85,15 @@ test.describe("malformed input is 400, never 500", () => {
     const res = await request.put("/api/settings", { headers: { ...(await as(user)).headers, "content-type": "application/json" }, data: "{nope" });
     expect(res.status()).toBe(400);
   });
+});
+
+test("planning a day that is not yours or does not exist is 404", async ({ request }) => {
+  const [a, b] = [await createUser({ onboarded: true }), await createUser({ onboarded: true })];
+  const { day } = await createDayWithTasks(a.id, "2026-10-01", "workday", "gym", [], makeDb(process.env.TEST_DATABASE_URL!));
+  for (const dayId of [day.id, UUID]) {
+    const res = await request.post("/api/plan", { headers: (await as(b)).headers, data: { dayId, mode: "dayoff", tasks: [PLAN_TASK] } });
+    expect(res.status()).toBe(404);
+  }
 });
 
 test("settings and presets round-trip for the owner and stay private", async ({ request }) => {

@@ -81,6 +81,10 @@ export async function getDayById(userId: string, dayId: string, db: Db = getDb()
   return day ?? null;
 }
 
+export async function setDayMode(userId: string, dayId: string, mode: "workday" | "dayoff", db: Db = getDb()) {
+  await db.update(days).set({ mode }).where(and(eq(days.id, dayId), eq(days.userId, userId)));
+}
+
 export type TaskSyncItem = Omit<Task, "id"> & { id?: string };
 
 /**

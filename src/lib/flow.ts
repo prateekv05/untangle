@@ -94,6 +94,8 @@ export type Action =
   | { type: "addTask"; task: Omit<Task, "id">; now: number }
   | { type: "mode"; mode: PlanMode }
   | { type: "build"; now: number }
+  /** A validated plan from /api/plan: reveal it with the entrance animation. Tasks carry their saved ids. */
+  | { type: "planned"; plan: Plan; tasks: Task[]; mode: PlanMode; plannedAt: string }
   | { type: "toggleDone"; taskId: string }
   | { type: "expand"; taskId: string | null }
   | { type: "moveLater"; taskId: string; to: string; now: number }
@@ -174,6 +176,8 @@ export function reducer(s: FlowState, a: Action): FlowState {
       const next: FlowState = { ...s, screen: "plan", sheet: null, expanded: null, done: [], moved: [], replan: null, undo: null, plannedAt: toHHMM(a.now), entrance: true, plan: null };
       return { ...next, plan: buildPlan(next, a.now) };
     }
+    case "planned":
+      return { ...s, screen: "plan", sheet: null, expanded: null, done: [], moved: [], replan: null, undo: null, tasks: a.tasks, mode: a.mode, plannedAt: a.plannedAt, entrance: true, plan: a.plan };
     case "toggleDone":
       return { ...s, entrance: false, done: s.done.includes(a.taskId) ? s.done.filter((d) => d !== a.taskId) : [...s.done, a.taskId] };
     case "expand":

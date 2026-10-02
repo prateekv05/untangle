@@ -31,7 +31,7 @@ export function TaskBlock({ task, block, done, expanded, was, locked, onExpand, 
           type="button"
           aria-expanded={expanded}
           onClick={(e) => { e.stopPropagation(); onExpand?.(); }}
-          className="min-h-6 flex-1 border-0 bg-transparent p-0 text-left text-base font-semibold leading-6 text-ink"
+          className="relative min-h-6 flex-1 border-0 bg-transparent p-0 text-left after:absolute after:inset-x-0 after:-inset-y-2.5 after:content-[''] text-base font-semibold leading-6 text-ink"
         >
           <span className={cn(done && "text-ink-muted line-through decoration-2")}>{task.title}</span>
           <span className="sr-only">, {block.start}{done ? ", finished" : ""}</span>

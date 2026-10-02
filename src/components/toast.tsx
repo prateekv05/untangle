@@ -15,7 +15,7 @@ export function Toast({ id, text, undo, ms, onUndo, onDone, preview }: { id: num
       <div role="status" className="toast-in pointer-events-auto flex min-h-[52px] items-center justify-between gap-3 rounded-md bg-ink px-4 text-sm text-ink-inverse shadow-lift">
         <span>{text}</span>
         {undo && (
-          <button type="button" onClick={onUndo} className="min-h-11 px-1 font-semibold underline">Undo</button>
+          <button type="button" onClick={onUndo} className="min-h-11 min-w-11 px-1 font-semibold underline">Undo</button>
         )}
       </div>
     </div>

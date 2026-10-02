@@ -15,7 +15,7 @@ export function WhereTag({ where, chevron, onClick, label }: { where: Where; che
     </>
   );
   return onClick ? (
-    <button type="button" onClick={onClick} aria-label={label ?? `Where: ${w.label}. Change`} className={cn(cls, "min-h-8")}>{inner}</button>
+    <button type="button" onClick={onClick} aria-label={label ?? `Where: ${w.label}. Change`} className={cn(cls, "min-h-8 relative after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-['']")}>{inner}</button>
   ) : (
     <span className={cls}>{inner}</span>
   );
@@ -31,7 +31,7 @@ export function TimeChip({ state, children, chevron, onClick, label }: { state: 
   );
   const inner = (<>{children}{chevron && <Icon name="chevron" size={12} weight={2.2} />}</>);
   return onClick ? (
-    <button type="button" onClick={onClick} aria-label={label} className={cn(cls, "min-h-8")}>{inner}</button>
+    <button type="button" onClick={onClick} aria-label={label} className={cn(cls, "min-h-8 relative after:absolute after:inset-x-0 after:-inset-y-[7px] after:content-['']")}>{inner}</button>
   ) : (
     <span className={cls}>{inner}</span>
   );

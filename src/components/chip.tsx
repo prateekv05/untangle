@@ -9,7 +9,7 @@ export function Chip({ children, dashed, small, selected, className, type = "but
       aria-pressed={rest.role ? undefined : selected}
       className={cn(
         "rounded-pill border bg-surface text-ink text-sm leading-5 shrink-0",
-        small ? "min-h-10 px-3.5 font-medium" : "min-h-11 px-4 font-semibold",
+        small ? "min-h-11 px-3.5 font-medium" : "min-h-11 px-4 font-semibold",
         dashed ? "border-dashed border-line text-ink-muted" : selected ? "border-ink" : "border-line",
         className,
       )}

@@ -65,6 +65,8 @@ export type TodayResponse = {
 };
 /** Today's saved day (in the account's timezone) with its latest plan, and tasks moved to today from an earlier day. */
 export const getToday = () => call<TodayResponse>("/api/day");
+/** The saved day for one date (YYYY-MM-DD), same shape as today's. */
+export const getDayOn = (date: string) => call<TodayResponse>(`/api/day?date=${date}`);
 
 /** One change to the saved day. The server re-plans the unfinished tasks and answers with the new day. */
 export const postDayEdit = (dayId: string, op: DayEditBody["op"]) =>

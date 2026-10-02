@@ -2,7 +2,7 @@ import { errorResponse, readJson } from "@/lib/api";
 import { understandBody } from "@/lib/api-schemas";
 import { readModelOverride } from "@/lib/ai/override";
 import { UnderstandFailedError, understand } from "@/lib/ai/understand";
-import { toTask } from "@/lib/day-edit";
+import { sameTitle, toTask } from "@/lib/day-edit";
 import { getEnv } from "@/lib/env";
 import { requireUser } from "@/lib/session";
 import { addDays, localClock } from "@/lib/timezone";
@@ -36,18 +36,24 @@ export async function POST(request: Request) {
     const offset = forDay ? { today: 0, tomorrow: 1, dayafter: 2 }[forDay] : result.planFor === "tomorrow" ? 1 : 0;
     const date = addDays(clock.date, offset);
     const weekday = (clock.weekday + offset) % 7;
-    const fresh = result.tasks.map(({ title, location, kind, durationMin, durationSource, fixedStart, due }) => ({ title, location, kind, durationMin, durationSource, fixedStart, due }));
+    const all = result.tasks.map(({ id, title, location, kind, durationMin, durationSource, fixedStart, due }) => ({ id, task: { title, location, kind, durationMin, durationSource, fixedStart, due } }));
 
     // A day that already has tasks is added to, never replaced: its plan stays saved until the user builds the new one.
+    // Something already on the day (open or finished) is not added a second time; what the user said about it points at the existing task.
     const existing = await getDay(user.id, date);
     const kept = existing?.tasks.filter((t) => t.status === "open") ?? [];
     const merging = !!existing && existing.tasks.length > 0;
+    const twin = (title: string) => (merging ? existing.tasks.find((t) => (t.status === "open" || t.status === "done") && sameTitle(t.title, title)) : undefined);
+    const fresh = all.filter((t) => !twin(t.task.title));
     const mode = merging ? existing.day.mode : settings.workDays.includes(weekday) ? "workday" : "dayoff";
     const saved = merging
-      ? { day: existing.day, tasks: await appendTasksToDay(user.id, existing.day.id, fresh) }
-      : await replaceDayWithTasks(user.id, date, mode, text, fresh);
+      ? { day: existing.day, tasks: await appendTasksToDay(user.id, existing.day.id, fresh.map((t) => t.task)) }
+      : await replaceDayWithTasks(user.id, date, mode, text, fresh.map((t) => t.task));
 
-    const ids = new Map(result.tasks.map((t, i) => [t.id, saved.tasks[i].id]));
+    const ids = new Map<string, string>([
+      ...fresh.map((t, i): [string, string] => [t.id, saved.tasks[i].id]),
+      ...all.flatMap((t): [string, string][] => { const o = twin(t.task.title); return o && o.status === "open" ? [[t.id, o.id]] : []; }),
+    ]);
     const remap = <T extends { taskId: string }>(q: T): T => ({ ...q, taskId: ids.get(q.taskId) ?? q.taskId });
     return Response.json({
       dayId: saved.day.id,
@@ -56,8 +62,8 @@ export async function POST(request: Request) {
       planFor: result.planFor,
       merged: merging,
       tasks: [...kept.map(toTask), ...saved.tasks],
-      questions: result.questions.map(remap),
-      groupings: result.groupings.map((g) => ({ ...g, taskIds: g.taskIds.map((id) => ids.get(id) ?? id) })),
+      questions: result.questions.filter((q) => ids.has(q.taskId)).map(remap),
+      groupings: result.groupings.map((g) => ({ ...g, taskIds: g.taskIds.flatMap((id) => ids.get(id) ?? []) })).filter((g) => g.taskIds.length > 0),
       model: meta.model,
     });
   } catch (e) {

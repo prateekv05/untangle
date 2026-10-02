@@ -356,7 +356,8 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
     screen = (
       <PlanScreen
         plan={s.plan} tasks={s.tasks} done={s.done} moved={s.moved} expanded={s.expanded} replan={s.replan} mode={s.mode}
-        plannedAt={s.plannedAt} entrance={s.entrance} offline={offline} settings={s.settings} presets={s.presets} today={today}
+        plannedAt={s.plannedAt} entrance={s.entrance} offline={offline} settings={s.settings} presets={s.presets} today={today} todayIso={todayIso()}
+        onPlanDay={(d) => { setForDay(d); dispatch({ type: "newdump" }); }}
         onExpand={(taskId) => dispatch({ type: "expand", taskId })}
         onToggleDone={toggleDone}
         onEdit={(taskId) => dispatch({ type: "sheet", sheet: { type: "edit", taskId } })}

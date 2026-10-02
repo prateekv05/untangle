@@ -160,7 +160,7 @@ function DayPanel({ dayId }: { dayId: string }) {
   return <DayBody day={res.value} />;
 }
 
-function DayBody({ day }: { day: HistoryDay }) {
+export function DayBody({ day }: { day: HistoryDay }) {
   const byId = new Map(day.tasks.map((t) => [t.id, t]));
   const blocks = [...day.plan.blocks].sort((a, b) => toMin(a.start) - toMin(b.start));
   const moved = day.tasks.filter((t) => t.status === "moved");

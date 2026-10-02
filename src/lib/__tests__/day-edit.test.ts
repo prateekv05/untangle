@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { activeTasks, checkOp, keptBlocksFor, resolveMoveTarget, type DayRow } from "../day-edit";
+import { activeTasks, checkOp, keptBlocksFor, resolveMoveTarget, sameTitle, type DayRow } from "../day-edit";
 import type { Plan } from "../schemas";
 
 const row = (id: string, status: DayRow["status"] = "open"): DayRow => ({ id, title: id, location: "anywhere", kind: "admin", durationMin: 30, durationSource: "user", fixedStart: null, due: null, status, movedTo: null });
@@ -39,4 +39,12 @@ test("move targets land on real later dates", () => {
   assert.equal(resolveMoveTarget("Next week", "2026-10-04"), "2026-10-05"); // Sunday
   assert.equal(resolveMoveTarget("2026-11-01", "2026-10-02"), "2026-11-01");
   assert.throws(() => resolveMoveTarget("Someday", "2026-10-02"));
+});
+
+test("sameTitle matches the same thing said two ways, not different things", () => {
+  assert.ok(sameTitle("Gym", "Go to the gym"));
+  assert.ok(sameTitle("call mom", "Call Mom."));
+  assert.ok(!sameTitle("Gym", "Gymnastics class"));
+  assert.ok(!sameTitle("Call mom", "Call dentist"));
+  assert.ok(!sameTitle("", "Gym"));
 });

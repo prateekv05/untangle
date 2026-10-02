@@ -2,7 +2,7 @@
  * Pure re-plan rules (docs/AI_CONTRACT.md 3b): turn the interpreted sentence into the changes to save and the
  * options the plan step must honour. No I/O, so the route and the evals share it.
  */
-import type { DayRow } from "./day-edit";
+import { sameTitle, type DayRow } from "./day-edit";
 import type { Plan, ReplanConstraints, Task } from "./schemas";
 import { toHHMM, toMin } from "./time";
 
@@ -62,7 +62,9 @@ export function planReplanChanges(c: ReplanConstraints, rows: DayRow[], plan: Pl
     durationOverrides[u.taskId] = Math.min(row.durationMin, Math.max(5, round5(left)));
   }
 
-  const newEvents = c.newEvents.map((e): Omit<Task, "id"> => ({
+  // Saying "I need to go to the gym" about a gym already on the day is not a second gym.
+  const onDay = rows.filter((r) => r.status === "open" || r.status === "done");
+  const newEvents = c.newEvents.filter((e) => !onDay.some((r) => sameTitle(r.title, e.title))).map((e): Omit<Task, "id"> => ({
     title: e.title.trim().slice(0, 120) || "Event",
     location: e.location,
     kind: "fixed",

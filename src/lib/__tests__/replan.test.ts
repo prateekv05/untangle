@@ -4,7 +4,7 @@ import type { DayRow } from "../day-edit";
 import { changeLines, planReplanChanges, NO_LIMITS } from "../replan";
 import type { Plan, ReplanConstraints } from "../schemas";
 
-const row = (id: string, status: DayRow["status"] = "open", durationMin = 60): DayRow => ({ id, title: id, location: "anywhere", kind: "admin", durationMin, durationSource: "user", fixedStart: null, due: null, status, movedTo: null });
+const row = (id: string, status: DayRow["status"] = "open", durationMin = 60): DayRow => ({ id, title: id === "gym" ? "Gym" : id, location: "anywhere", kind: "admin", durationMin, durationSource: "user", fixedStart: null, due: null, status, movedTo: null });
 const block = (taskId: string, start: string) => ({ taskId, start, durationMin: 30, outingId: null, reason: "r", hop: null });
 const plan: Plan = { blocks: [block("sql", "09:00"), block("gym", "13:00"), block("mom", "15:00")], outings: [], decisions: [], dropped: [], note: null };
 const empty: ReplanConstraints = { now: "11:45", doneTaskIds: [], unfinished: [], newEvents: [], capacityMin: null, lighterAfter: null, mustFinishTaskIds: [], dropTaskIds: [], delayMin: null };
@@ -73,4 +73,10 @@ test("changes are applied to the rows the way the route saves them", () => {
   assert.equal(by.gym.movedTo, "2026-10-04");
   assert.equal(by.ev1.kind, "fixed");
   assert.equal(by.ev1.status, "open");
+});
+
+test("a new event about something already on the day is not added a second time", () => {
+  const event = (title: string) => ({ title, start: "17:00", durationMin: 60, location: "outside" as const });
+  const c = planReplanChanges({ ...empty, newEvents: [event("Go to the gym"), event("Dentist")] }, rows, plan, now);
+  assert.deepEqual(c.newEvents.map((e) => e.title), ["Dentist"]);
 });

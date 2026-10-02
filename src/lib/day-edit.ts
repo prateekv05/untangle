@@ -22,6 +22,14 @@ export const keptBlocksFor = (plan: Plan | null, rows: DayRow[]): Block[] => {
   return (plan?.blocks ?? []).filter((b) => done.has(b.taskId));
 };
 
+const words = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+/** True when two titles name the same thing ("Gym" and "Go to the gym"): equal once punctuation and case are gone, or one contains the other as whole words. */
+export function sameTitle(a: string, b: string): boolean {
+  const x = ` ${words(a)} `;
+  const y = ` ${words(b)} `;
+  return x.trim() !== "" && y.trim() !== "" && (x === y || x.includes(y) || y.includes(x));
+}
+
 /** Throws InputError when the change makes no sense for the day as it stands. */
 export function checkOp(rows: DayRow[], op: Op): void {
   if (op.type === "add") return;

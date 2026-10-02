@@ -6,13 +6,17 @@ import type { Preset } from "@/lib/guess";
 import type { PlanMode } from "@/lib/planner";
 import type { Block, Plan, Settings, Task } from "@/lib/schemas";
 import { toMin } from "@/lib/time";
+import type { PlanForDay } from "@/lib/api-schemas";
+import { addDays } from "@/lib/timezone";
 import { AddTaskCard } from "../add-task-card";
 import { Button } from "../button";
 import { Decisions } from "../decisions";
 import { Icon } from "../icon";
 import { InstallHint } from "../install-hint";
 import { Outing } from "../outing";
+import { SegmentedControl } from "../segmented-control";
 import { TaskBlock } from "../task-block";
+import { UpcomingDay } from "../upcoming-day";
 import { NowMarker, ThreadHop, ThreadMarker, ThreadRow } from "../thread";
 import { TopBar } from "../top-bar";
 import { cn } from "@/lib/cn";
@@ -31,16 +35,18 @@ export function groupBlocks(blocks: Block[]): Item[] {
 }
 
 const itemStart = (i: Item) => toMin(i.kind === "row" ? i.block.start : i.blocks[0].start);
+const addDaysTo = (d: Date, n: number): Date => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 export const dateHeading = (d: Date): string => d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
 export function PlanScreen(p: {
   plan: Plan; tasks: Task[]; done: string[]; moved: Moved[]; expanded: string | null; replan: Replan | null; mode: PlanMode;
-  plannedAt: string; entrance: boolean; offline?: boolean; settings: Settings; presets: Preset[]; today: Date;
+  plannedAt: string; entrance: boolean; offline?: boolean; settings: Settings; presets: Preset[]; today: Date; todayIso: string; onPlanDay: (d: PlanForDay) => void;
   onExpand: (id: string) => void; onToggleDone: (id: string) => void; onEdit: (id: string) => void; onMove: (id: string) => void;
   onBringBack: (id: string) => void; onAdd: (t: Omit<Task, "id">) => void; onReplan: (mic: boolean) => void; onNewDump: () => void; onSettings: () => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [doneOpen, setDoneOpen] = useState(false);
+  const [view, setView] = useState<PlanForDay>("today");
   const byId = new Map(p.tasks.map((t) => [t.id, t]));
   const items = groupBlocks(p.plan.blocks);
   const doneSet = new Set(p.done);
@@ -95,11 +101,30 @@ export function PlanScreen(p: {
   pushMarkers(Infinity);
 
   const open = p.plan.blocks.length === 0;
+  const names = { today: "today", tomorrow: "tomorrow", dayafter: dateHeading(addDaysTo(p.today, 2)).split(",")[0] };
+  const tabs = (
+    <div className="mb-4">
+      <SegmentedControl<PlanForDay> label="Day" value={view} onChange={setView} options={[{ value: "today", label: "Today" }, { value: "tomorrow", label: "Tomorrow" }, { value: "dayafter", label: names.dayafter }]} />
+    </div>
+  );
+  if (view !== "today") {
+    const offset = view === "tomorrow" ? 1 : 2;
+    return (
+      <div className="min-h-dvh pb-10">
+        <TopBar onSettings={p.onSettings} />
+        <main className="px-5 pt-[22px]">
+          {tabs}
+          <UpcomingDay key={view} date={addDays(p.todayIso, offset)} name={names[view]} onAdd={() => p.onPlanDay(view)} />
+        </main>
+      </div>
+    );
+  }
   return (
     <div className="min-h-dvh pb-[168px]">
       <TopBar onSettings={p.onSettings} />
       <main>
         <div className="px-5 pt-[22px]">
+          {tabs}
           <h1 className="m-0 text-[28px] font-bold leading-8 tracking-[-0.02em]">{p.replan ? `Re-planned at ${p.replan.at}` : dateHeading(p.today)}</h1>
           <p className="m-0 mt-0.5 text-sm font-medium leading-5 text-ink-muted">
             {p.replan ? <>You said: &ldquo;{p.replan.said}&rdquo;</> : `${p.mode === "dayoff" ? "Day off" : "Workday"}. Planned at ${p.plannedAt}.`}

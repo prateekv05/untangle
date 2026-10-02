@@ -46,3 +46,26 @@ export type TaskPatchBody = z.infer<typeof TaskPatchBody>;
 
 /** POST /api/understand. The length cap comes from MAX_DUMP_CHARS, so the route builds this schema with it. */
 export const understandBody = (maxChars: number) => z.object({ text: z.string().trim().min(1).max(maxChars) }).strict();
+
+/** POST /api/plan: the day and the tasks as the user left them on Understand (ids are the saved ones; new tasks have none). */
+export const PlanBody = z
+  .object({
+    dayId: z.string().uuid(),
+    tasks: z
+      .array(
+        z.object({
+          id: z.string().uuid().optional(),
+          title: z.string().trim().min(1).max(120),
+          location: Location,
+          kind: Kind,
+          durationMin: z.number().int().min(5).max(480),
+          durationSource: z.enum(["user", "preset", "estimated"]),
+          fixedStart: HHMM.nullable(),
+          due: Due.nullable(),
+        }),
+      )
+      .min(1)
+      .max(40),
+  })
+  .strict();
+export type PlanBody = z.infer<typeof PlanBody>;

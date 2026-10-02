@@ -75,6 +75,39 @@ export async function getDay(userId: string, date: string, db: Db = getDb()) {
   };
 }
 
+/** A day by id, only if it is the user's. */
+export async function getDayById(userId: string, dayId: string, db: Db = getDb()) {
+  const [day] = await db.select().from(days).where(and(eq(days.id, dayId), eq(days.userId, userId))).limit(1);
+  return day ?? null;
+}
+
+export type TaskSyncItem = Omit<Task, "id"> & { id?: string };
+
+/**
+ * Makes the day's open tasks exactly `items`, in order: known ids are updated, items without a known id are inserted,
+ * open tasks that are missing are marked deleted. Returns the open tasks. neon-http has no transactions, so this is
+ * a short run of single statements; a retry converges on the same result.
+ */
+export async function syncDayTasks(userId: string, dayId: string, items: TaskSyncItem[], db: Db = getDb()): Promise<Task[]> {
+  if (!(await getDayById(userId, dayId, db))) throw new NotFoundError("Day");
+  const existing = await db.select().from(tasks).where(and(eq(tasks.dayId, dayId), eq(tasks.status, "open")));
+  const open = new Set(existing.map((r) => r.id));
+  const keep = new Set(items.flatMap((i) => (i.id && open.has(i.id) ? [i.id] : [])));
+  const gone = [...open].filter((id) => !keep.has(id));
+  if (gone.length) await db.update(tasks).set({ status: "deleted" }).where(and(eq(tasks.dayId, dayId), inArray(tasks.id, gone)));
+  const out: Task[] = [];
+  for (const [position, { id, ...fields }] of items.entries()) {
+    if (id && open.has(id)) {
+      const [row] = await db.update(tasks).set({ ...fields, position }).where(and(eq(tasks.id, id), eq(tasks.dayId, dayId))).returning();
+      out.push(rowToTask(row));
+    } else {
+      const [row] = await db.insert(tasks).values({ ...fields, dayId, position }).returning();
+      out.push(rowToTask(row));
+    }
+  }
+  return out;
+}
+
 /** Inserts the next version in one statement; the unique (day_id, version) index catches a concurrent writer. */
 export async function savePlan(
   userId: string,

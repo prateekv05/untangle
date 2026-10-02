@@ -60,3 +60,17 @@ test("change lines are true to the plans", () => {
   const lines = changeLines(plan, next, new Map([["ev", "Meeting"], ["gym", "Gym"], ["mom", "Call mom"]]), { gym: "13:00" }, NO_LIMITS, ["ev"]);
   assert.deepEqual(lines, ["Meeting is in at 14:00, and the rest works around it", "Call mom waits for another day", "Gym moved from 13:00"]);
 });
+
+import { applyReplanChanges } from "../replan";
+
+test("changes are applied to the rows the way the route saves them", () => {
+  const c = planReplanChanges({ ...empty, unfinished: [{ taskId: "sql", remainingMin: null }], dropTaskIds: ["gym"], doneTaskIds: ["mom"], newEvents: [{ title: "Meeting", start: "14:00", durationMin: 60, location: "work" }] }, rows, plan, now);
+  const next = applyReplanChanges(rows, c, ["ev1"], "2026-10-04");
+  const by = Object.fromEntries(next.map((r) => [r.id, r]));
+  assert.equal(by.sql.status, "open");
+  assert.equal(by.mom.status, "done");
+  assert.equal(by.gym.status, "moved");
+  assert.equal(by.gym.movedTo, "2026-10-04");
+  assert.equal(by.ev1.kind, "fixed");
+  assert.equal(by.ev1.status, "open");
+});

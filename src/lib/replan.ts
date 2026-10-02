@@ -116,3 +116,14 @@ export function changeLines(prev: Plan | null, next: Plan, titles: Map<string, s
   if (moved.length) lines.push(moved.length === 1 ? `${name(moved[0])} moved from ${was[moved[0]]}` : `${moved.length} other tasks moved to fit`);
   return lines.slice(0, 6);
 }
+
+/** The day's rows after the changes are saved, without a database: used by the evals. `newIds` name the new events in order. */
+export function applyReplanChanges(rows: DayRow[], c: ReplanChanges, newIds: string[], tomorrow: string): DayRow[] {
+  const next = rows.map((r): DayRow => {
+    if (c.reopen.includes(r.id)) return { ...r, status: "open" };
+    if (c.markDone.includes(r.id)) return { ...r, status: "done" };
+    if (c.drop.includes(r.id)) return { ...r, status: "moved", movedTo: tomorrow };
+    return r;
+  });
+  return [...next, ...c.newEvents.map((e, i): DayRow => ({ ...e, id: newIds[i], status: "open", movedTo: null }))];
+}

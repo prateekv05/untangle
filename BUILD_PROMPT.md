@@ -111,19 +111,28 @@ Phase 4. Implement the understand call.
 [x] Acceptance: understand works with each of the four models (same prompt, same schema; report any that cannot structured-output reliably); the canonical dump yields 7 tasks with correct locations; asks a due question for SQL and a duration question for gym and nothing else; "gym for 90 minutes" asks no duration question; the injection case is ignored; evals for understand pass at ≥ 95% over 3 runs.
 ```
 
-## [ ] Phase 5: plan + validator + fallback
+## [~] Phase 5: plan + validator + fallback
 
 ```
 Phase 5. Implement the plan call with the safety net.
 
-1. [ ] src/lib/ai/plan.ts: structured output (Zod Plan) using prompts/plan.md. Inputs per docs/AI_CONTRACT.md (tasks with answers, settings, mode, now, planFrom).
-2. [ ] Pipeline in src/lib/ai/pipeline.ts: model → Zod → validatePlan → one repair call with the error list → planDay() fallback. Record source ("llm" | "fallback"), the model used, latency, token counts, validator errors (never transcripts) in logs, and save the model in plans.model.
-3. [ ] POST /api/plan: loads tasks + answers, builds mode from settings and date, runs the pipeline, saves plan version 1, returns the Plan.
-4. [ ] Wire Understand → thinking → Plan with real data. Decisions card, outing group, hops, note and "Didn't fit today" all come from the Plan object. Compute workday/dayoff markers from settings.
-5. [ ] Never reveal an unvalidated plan. If streaming, stream into a staging buffer and reveal after validation with the entrance animation. If not streaming, keep the thinking screen until done.
-6. [ ] Extend scripts/eval.ts to run full pipeline cases and every plan assertion in evals/README.md.
+1. [x] src/lib/ai/plan.ts: structured output (Zod Plan) using prompts/plan.md. Inputs per docs/AI_CONTRACT.md (tasks with answers, settings, mode, now, planFrom).
+2. [x] Pipeline in src/lib/ai/pipeline.ts: model → Zod → validatePlan → one repair call with the error list → planDay() fallback. Record source ("llm" | "fallback"), the model used, latency, token counts, validator errors (never transcripts) in logs, and save the model in plans.model.
+3. [x] POST /api/plan: loads tasks + answers, builds mode from settings and date, runs the pipeline, saves plan version 1, returns the Plan.
+4. [x] Wire Understand → thinking → Plan with real data. Decisions card, outing group, hops, note and "Didn't fit today" all come from the Plan object. Compute workday/dayoff markers from settings.
+5. [x] Never reveal an unvalidated plan. If streaming, stream into a staging buffer and reveal after validation with the entrance animation. If not streaming, keep the thinking screen until done.
+6. [x] Extend scripts/eval.ts to run full pipeline cases and every plan assertion in evals/README.md.
 
-[ ] Acceptance: `npm run eval` passes ≥ 95% for pipeline cases over 3 runs; fallback rate under 5% (report it, per model); a deliberately broken model response (inject via a test hook) is repaired or falls back and the user sees a valid plan; plan p50 latency under 6 s (report p50/p95).
+[ ] Acceptance (open: plan p50 latency, see below): `npm run eval` passes ≥ 95% for pipeline cases over 3 runs; fallback rate under 5% (report it, per model); a deliberately broken model response (inject via a test hook) is repaired or falls back and the user sees a valid plan; plan p50 latency under 6 s (report p50/p95).
+
+Measured (9 pipeline cases x 3 runs, understand on Haiku 4.5, 27 plan calls per model):
+| plan model | pass | fallback | repaired | plan p50 / p95 |
+| claude-sonnet-5-5 | 100% | 0% | 0 | 7.8 s / 14.1 s |
+| gpt-6-luna | 100% | 0% | 0 | 7.1 s / 11.3 s |
+| claude-haiku-4-5 | 100% | 18.5% | 4 | 5.3 s / 9.8 s (concurrent run) |
+| gpt-6.1-sol | 92.6% | 0% | 0 | 13.8 s / 23.3 s (concurrent run) |
+Broken responses (invalid plan, throwing model) are covered by pipeline unit tests: repaired once or replaced by planDay().
+Open: plan p50 is above the 6 s target on every model with a low fallback rate. Haiku is fastest but falls back too often (workday rules).
 ```
 
 ## [ ] Phase 6: execute

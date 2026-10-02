@@ -2,7 +2,7 @@
 import type { Preset } from "./guess";
 import type { HistoryItem } from "../db/queries/history";
 import type { DayView, ReplanView } from "./day-response";
-import type { DayEditBody } from "./api-schemas";
+import type { DayEditBody, PlanForDay } from "./api-schemas";
 import type { DraftPayload } from "./draft";
 import type { Plan, Question, Settings, Task, UnderstandResult } from "./schemas";
 
@@ -39,16 +39,18 @@ export type UnderstandResponse = {
   date: string;
   mode: "workday" | "dayoff";
   planFor: UnderstandResult["planFor"];
+  /** True when the day already had tasks and the new ones were added to it. */
+  merged: boolean;
   tasks: Task[];
   questions: Question[];
   groupings: UnderstandResult["groupings"];
   model: string;
 };
-export const postUnderstand = (text: string) => call<UnderstandResponse>("/api/understand", { method: "POST", body: JSON.stringify({ text }) });
+export const postUnderstand = (text: string, forDay?: PlanForDay) => call<UnderstandResponse>("/api/understand", { method: "POST", body: JSON.stringify({ text, forDay }) });
 export const patchTask = (id: string, patch: Partial<Pick<Task, "location" | "durationMin" | "durationSource" | "fixedStart" | "due" | "title" | "kind">> & { status?: "open" | "done" }) =>
   call<Task>(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 
-export type PlanResponse = { plan: Plan; tasks: Task[]; mode: "workday" | "dayoff"; source: "llm" | "fallback"; model: string | null; version: number; plannedAt: string };
+export type PlanResponse = { plan: Plan; tasks: Task[]; done: string[]; mode: "workday" | "dayoff"; source: "llm" | "fallback"; model: string | null; version: number; plannedAt: string };
 /** Saves the tasks as left on Understand and plans the day. New tasks (local ids) are sent without an id. */
 export const postPlan = (dayId: string, mode: PlanResponse["mode"], tasks: Task[]) =>
   call<PlanResponse>("/api/plan", {

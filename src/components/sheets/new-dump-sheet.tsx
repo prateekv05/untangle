@@ -3,12 +3,12 @@
 import { Button } from "../button";
 import { Sheet } from "../sheet";
 
-/** Starting over replaces today's plan once the new list is read, so it asks first. */
+/** A new dump is added to the day you pick; nothing already planned is thrown away. */
 export function NewDumpSheet({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
   return (
-    <Sheet title="Start a new dump" voice="Today's plan is replaced as soon as I've read your new list. Until then it stays saved." onClose={onClose}>
+    <Sheet title="Start a new dump" voice="Your plan stays as it is. I'll add what you tell me to the day you pick, and rebuild that day around it." onClose={onClose}>
       <div className="mt-2"><Button onClick={onConfirm}>Start a new dump</Button></div>
-      <div className="mt-1.5 flex justify-center"><Button variant="quiet" onClick={onClose}>Keep my plan</Button></div>
+      <div className="mt-1.5 flex justify-center"><Button variant="quiet" onClick={onClose}>Not now</Button></div>
     </Sheet>
   );
 }

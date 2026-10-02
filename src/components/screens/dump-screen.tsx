@@ -3,11 +3,13 @@
 import { useId, useRef, useState } from "react";
 import type { DraftPayload } from "@/lib/draft";
 import { BUILT_IN_PRESETS, countThings, type Preset } from "@/lib/guess";
+import type { PlanForDay } from "@/lib/api-schemas";
 import { VOICE_PROBLEM } from "@/lib/stt/copy";
 import { useVoice } from "@/lib/use-voice";
 import { Button } from "../button";
 import { Chip } from "../chip";
 import { Icon } from "../icon";
+import { SegmentedControl } from "../segmented-control";
 import { Sheet } from "../sheet";
 import { TopBar } from "../top-bar";
 import { Waveform } from "../waveform";
@@ -27,10 +29,18 @@ const draftSummary = (d: DraftPayload): string => {
   return `I kept ${n === 1 ? "1 thing" : `${n} things`} for you, right where you stopped.`;
 };
 
-export function DumpScreen({ text, onText, onSubmit, onSettings, onYours, presets, carried = [], onCarry, draft = null, onContinueDraft, onDiscardDraft, notice, onRetry, examples, onExample, name, offline }: {
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const dayOptions = (today: Date): { value: PlanForDay; label: string }[] => [
+  { value: "today", label: "Today" },
+  { value: "tomorrow", label: "Tomorrow" },
+  { value: "dayafter", label: WEEKDAYS[(today.getDay() + 2) % 7] },
+];
+
+export function DumpScreen({ text, onText, onSubmit, onSettings, onYours, presets, carried = [], onCarry, draft = null, onContinueDraft, onDiscardDraft, notice, onRetry, examples, onExample, name, offline, forDay = "today", onForDay, today = new Date(), onBackToPlan }: {
   text: string; onText: (t: string) => void; onSubmit: () => void; onSettings: () => void; onYours: () => void;
   presets: Preset[]; carried?: string[]; onCarry?: (title: string) => void; draft?: DraftPayload | null; onContinueDraft?: () => void; onDiscardDraft?: () => void; notice?: string | null; onRetry?: () => void;
   examples?: { label: string; text: string }[]; onExample?: (text: string) => void; name?: string | null; offline?: boolean;
+  forDay?: PlanForDay; onForDay?: (d: PlanForDay) => void; today?: Date; onBackToPlan?: () => void;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const noticeId = useId();
@@ -64,7 +74,17 @@ export function DumpScreen({ text, onText, onSubmit, onSettings, onYours, preset
       <TopBar onSettings={onSettings} />
       <main className="flex flex-1 flex-col px-5 pt-[22px]">
         <h1 id="dump-heading" className="m-0 text-4xl font-bold leading-[38px] tracking-[-0.02em]">{name ? `What's on your mind, ${name}?` : "What's on your mind?"}</h1>
-        <p className="mb-[18px] mt-2.5 text-ink-muted">Say it or type it, in any order. I&apos;ll untangle it.</p>
+        <p className="mb-3.5 mt-2.5 text-ink-muted">Say it or type it, in any order. I&apos;ll untangle it.</p>
+        {onForDay && (
+          <div className="mb-3.5">
+            <SegmentedControl label="Plan for" value={forDay} options={dayOptions(today)} onChange={onForDay} />
+          </div>
+        )}
+        {onBackToPlan && (
+          <div className="-mt-1 mb-2.5">
+            <Button variant="quiet" onClick={onBackToPlan}>Back to my plan</Button>
+          </div>
+        )}
         {draft && (
           <section aria-label="Unfinished list" className="mb-3.5 rounded-md border border-line bg-surface p-4">
             <p className="m-0 font-semibold">You have an unfinished list</p>

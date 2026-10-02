@@ -2,10 +2,11 @@ import { errorResponse, readJson } from "@/lib/api";
 import { understandBody } from "@/lib/api-schemas";
 import { readModelOverride } from "@/lib/ai/override";
 import { UnderstandFailedError, understand } from "@/lib/ai/understand";
+import { toTask } from "@/lib/day-edit";
 import { getEnv } from "@/lib/env";
 import { requireUser } from "@/lib/session";
 import { addDays, localClock } from "@/lib/timezone";
-import { getSettings, incrementAiUsage, replaceDayWithTasks } from "@/db/queries";
+import { appendTasksToDay, getDay, getSettings, incrementAiUsage, replaceDayWithTasks } from "@/db/queries";
 import { listPresets } from "@/db/queries/presets";
 
 /**
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser();
     const env = getEnv();
-    const { text } = understandBody(env.MAX_DUMP_CHARS).parse(await readJson(request));
+    const { text, forDay } = understandBody(env.MAX_DUMP_CHARS).parse(await readJson(request));
     const settings = await getSettings(user.id);
     const clock = localClock(settings.timezone);
     await incrementAiUsage(user.id, clock.date, env.DAILY_AI_CALL_LIMIT);
@@ -31,10 +32,20 @@ export async function POST(request: Request) {
     }
 
     const { result, meta } = out;
-    const date = result.planFor === "tomorrow" ? addDays(clock.date, 1) : clock.date;
-    const weekday = result.planFor === "tomorrow" ? (clock.weekday + 1) % 7 : clock.weekday;
-    const mode = settings.workDays.includes(weekday) ? "workday" : "dayoff";
-    const saved = await replaceDayWithTasks(user.id, date, mode, text, result.tasks.map(({ title, location, kind, durationMin, durationSource, fixedStart, due }) => ({ title, location, kind, durationMin, durationSource, fixedStart, due })));
+    // The day the user picked wins; without a pick, "tomorrow" in the text decides.
+    const offset = forDay ? { today: 0, tomorrow: 1, dayafter: 2 }[forDay] : result.planFor === "tomorrow" ? 1 : 0;
+    const date = addDays(clock.date, offset);
+    const weekday = (clock.weekday + offset) % 7;
+    const fresh = result.tasks.map(({ title, location, kind, durationMin, durationSource, fixedStart, due }) => ({ title, location, kind, durationMin, durationSource, fixedStart, due }));
+
+    // A day that already has tasks is added to, never replaced: its plan stays saved until the user builds the new one.
+    const existing = await getDay(user.id, date);
+    const kept = existing?.tasks.filter((t) => t.status === "open") ?? [];
+    const merging = !!existing && existing.tasks.length > 0;
+    const mode = merging ? existing.day.mode : settings.workDays.includes(weekday) ? "workday" : "dayoff";
+    const saved = merging
+      ? { day: existing.day, tasks: await appendTasksToDay(user.id, existing.day.id, fresh) }
+      : await replaceDayWithTasks(user.id, date, mode, text, fresh);
 
     const ids = new Map(result.tasks.map((t, i) => [t.id, saved.tasks[i].id]));
     const remap = <T extends { taskId: string }>(q: T): T => ({ ...q, taskId: ids.get(q.taskId) ?? q.taskId });
@@ -43,7 +54,8 @@ export async function POST(request: Request) {
       date,
       mode,
       planFor: result.planFor,
-      tasks: saved.tasks,
+      merged: merging,
+      tasks: [...kept.map(toTask), ...saved.tasks],
       questions: result.questions.map(remap),
       groupings: result.groupings.map((g) => ({ ...g, taskIds: g.taskIds.map((id) => ids.get(id) ?? id) })),
       model: meta.model,

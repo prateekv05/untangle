@@ -176,3 +176,21 @@ test("planned reveals the server's plan, tasks and mode with the entrance animat
   assert.equal(s.entrance, true);
   assert.deepEqual(s.done, []);
 });
+
+test("starting a new dump opens a blank Dump screen and keeps the plan, so Back to my plan has something to show", () => {
+  const before = reducer(built(), { type: "toggleDone", taskId: exampleTasks()[0].id });
+  const s = reducer(before, { type: "newdump" });
+  assert.equal(s.screen, "dump");
+  assert.equal(s.text, "");
+  assert.equal(s.plan, before.plan);
+  assert.deepEqual(s.tasks, before.tasks);
+  assert.deepEqual(s.done, before.done);
+  assert.equal(reducer(s, { type: "screen", screen: "plan" }).plan, before.plan);
+});
+
+test("planned keeps the tasks already finished on the day", () => {
+  const server = built();
+  const id = server.tasks[0].id;
+  const s = reducer(initialState(), { type: "planned", dayId: "d1", version: 2, plan: server.plan!, tasks: server.tasks, mode: "workday", plannedAt: "09:15", done: [id] });
+  assert.deepEqual(s.done, [id]);
+});

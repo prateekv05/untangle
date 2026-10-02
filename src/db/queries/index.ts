@@ -59,6 +59,16 @@ export async function replaceDayWithTasks(
   return createDayWithTasks(userId, date, mode, rawDump, newTasks, db);
 }
 
+/** Adds tasks to the end of a day that already exists, leaving its tasks and plans untouched. Returns the new tasks in order. */
+export async function appendTasksToDay(userId: string, dayId: string, newTasks: Array<Omit<Task, "id">>, db: Db = getDb()): Promise<Task[]> {
+  if (!(await getDayById(userId, dayId, db))) throw new NotFoundError("Day");
+  if (newTasks.length === 0) return [];
+  const [{ next }] = await db.select({ next: sql<number>`coalesce(max(${tasks.position}), -1) + 1` }).from(tasks).where(eq(tasks.dayId, dayId));
+  const rows = await db.insert(tasks).values(newTasks.map((t, i) => ({ ...t, dayId, position: Number(next) + i }))).returning();
+  rows.sort((a, b) => a.position - b.position);
+  return rows.map(rowToTask);
+}
+
 /** Day, its non-deleted tasks, and the latest plan version. null when the user has no day for that date. */
 export async function getDay(userId: string, date: string, db: Db = getDb()) {
   const [day] = await db.select().from(days).where(and(eq(days.userId, userId), eq(days.date, date))).limit(1);

@@ -105,7 +105,7 @@ export type Action =
   | { type: "mode"; mode: PlanMode }
   | { type: "build"; now: number }
   /** A validated plan from /api/plan: reveal it with the entrance animation. Tasks carry their saved ids. */
-  | { type: "planned"; dayId: string; version: number; plan: Plan; tasks: Task[]; mode: PlanMode; plannedAt: string }
+  | { type: "planned"; dayId: string; version: number; plan: Plan; tasks: Task[]; mode: PlanMode; plannedAt: string; done?: string[] }
   /** Today's saved day, put back on screen when the app opens. */
   | { type: "loaded"; view: DayView }
   /** A saved change and its re-plan from /api/day/edit: swap everything in place and offer Undo. */
@@ -128,6 +128,8 @@ export type Action =
   | { type: "presetRestore"; preset: Preset }
   /** The unfinished list from the account, put back where the user left it (Dump or Understand). */
   | { type: "restoreDraft"; draft: DraftPayload }
+  /** Back to a blank Dump screen while the saved plan stays in state, so "Back to my plan" works. */
+  | { type: "newdump" }
   | { type: "reset" };
 
 const SNAP = (s: FlowState): Snapshot => ({ plan: s.plan, tasks: s.tasks, moved: s.moved, done: s.done, replan: s.replan, version: s.version });
@@ -204,7 +206,7 @@ export function reducer(s: FlowState, a: Action): FlowState {
       return { ...next, plan: buildPlan(next, a.now) };
     }
     case "planned":
-      return { ...s, screen: "plan", sheet: null, expanded: null, done: [], moved: [], replan: null, undo: null, tasks: a.tasks, mode: a.mode, plannedAt: a.plannedAt, entrance: true, plan: a.plan, dayId: a.dayId, version: a.version };
+      return { ...s, screen: "plan", sheet: null, expanded: null, done: a.done ?? [], moved: [], replan: null, undo: null, tasks: a.tasks, mode: a.mode, plannedAt: a.plannedAt, entrance: true, plan: a.plan, dayId: a.dayId, version: a.version };
     case "loaded":
       return { ...s, ...fromView(a.view), screen: "plan", sheet: null, expanded: null, replan: null, undo: null, entrance: false };
     case "mutated":
@@ -245,6 +247,8 @@ export function reducer(s: FlowState, a: Action): FlowState {
       const d = a.draft;
       return { ...s, screen: d.screen, sheet: null, expanded: null, text: d.text, mode: d.mode, tasks: d.tasks, questions: d.questions, groupings: d.groupings, plan: null, done: [], moved: [], replan: null, undo: null, entrance: false, nextId: nextLocalId(d.tasks) };
     }
+    case "newdump":
+      return { ...s, screen: "dump", thinking: "dump", text: "", questions: [], groupings: [], sheet: null, expanded: null, replan: null, entrance: false };
     case "reset":
       return { ...initialState(), settings: s.settings, presets: s.presets };
   }

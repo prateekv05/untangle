@@ -6,7 +6,7 @@ import { APPOINTMENT_DUMP, EXAMPLE_DUMP } from "@/fixtures/example";
 import { browserTimezone, nowMinutes } from "@/lib/clock";
 import { resolveMoveTarget } from "@/lib/day-edit";
 import { draftFrom, type DraftPayload } from "@/lib/draft";
-import type { DayEditBody } from "@/lib/api-schemas";
+import type { DayEditBody, PlanForDay } from "@/lib/api-schemas";
 import type { ReplanView } from "@/lib/day-response";
 import { fmtMoveDate, initialState, reducer } from "@/lib/flow";
 import { countThings } from "@/lib/guess";
@@ -144,6 +144,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   const now = useCallback(() => nowMinutes(window.location.search), []);
   const today = useMemo(() => new Date(), []);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [forDay, setForDay] = useState<PlanForDay>("today");
   const closeSheet = () => dispatch({ type: "sheet", sheet: null });
   const openSettings = () => dispatch({ type: "sheet", sheet: { type: "settings" } });
 
@@ -158,7 +159,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
     setNotice(null);
     dispatch({ type: "text", text });
     dispatch({ type: "think", kind: "dump" });
-    postUnderstand(text.trim())
+    postUnderstand(text.trim(), forDay)
       .then((res) => {
         if (run !== understandRun.current) return;
         understood.current = res;
@@ -243,7 +244,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
     const res = planned.current;
     if (!res) return;
     draftSave.clear();
-    dispatch({ type: "planned", dayId: understandDayId ?? "", version: res.version, plan: res.plan, tasks: res.tasks, mode: res.mode, plannedAt: res.plannedAt });
+    dispatch({ type: "planned", dayId: understandDayId ?? "", version: res.version, plan: res.plan, tasks: res.tasks, mode: res.mode, plannedAt: res.plannedAt, done: res.done });
   }, [draftSave, understandDayId]);
 
   // Changes to the saved plan. Each one is saved on the server, which re-plans the unfinished tasks and answers with the new day.
@@ -376,6 +377,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         presets={s.presets} notice={notice?.text} onRetry={notice?.retry ? submitDump : undefined} name={name} offline={offline}
         carried={carried} onCarry={(title) => { dispatch({ type: "text", text: `${s.text.trim() ? `${s.text.trim()}\n` : ""}${title}` }); setTaken((t) => [...t, title]); }}
         draft={pendingDraft && s.text === "" ? pendingDraft : null} onContinueDraft={continueDraft} onDiscardDraft={() => setPendingDraft(null)}
+        forDay={forDay} onForDay={setForDay} today={today} onBackToPlan={s.plan && s.dayId ? () => dispatch({ type: "screen", screen: "plan" }) : undefined}
         examples={demo ? EXAMPLES : undefined} onExample={(text) => dispatch({ type: "text", text })}
       />
     );
@@ -399,7 +401,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
           onSubmit={(text) => { closeSheet(); startReplan(text); }}
         />
       )}
-      {s.sheet?.type === "newdump" && <NewDumpSheet onClose={closeSheet} onConfirm={() => dispatch({ type: "reset" })} />}
+      {s.sheet?.type === "newdump" && <NewDumpSheet onClose={closeSheet} onConfirm={() => dispatch({ type: "newdump" })} />}
       {s.sheet?.type === "settings" && account !== "loading" && (
         <SettingsSheet loadFailed={account === "failed"} onRetry={retryLoad} settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onHistory={() => { closeSheet(); setHistoryOpen(true); }} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={saveSettings} />
       )}

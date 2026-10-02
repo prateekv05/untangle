@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DayQuery, PresetBody, SettingsInput, TaskPatchBody } from "../api-schemas";
+import { DayEditBody, DayQuery, DayUndoBody, PresetBody, SettingsInput, TaskPatchBody } from "../api-schemas";
 
 const settings = { workStart: "09:00", workEnd: "17:00", workDays: [1, 2, 3], wake: "07:00", sleep: "23:00", timezone: "Europe/London" };
 
@@ -26,7 +26,8 @@ test("preset: trims the phrase, no fixed kind, duration 5 to 480 or null", () =>
 test("day query needs a real ISO date", () => {
   assert.equal(DayQuery.safeParse({ date: "2026-10-01" }).success, true);
   for (const date of ["tomorrow", "2026-02-30", "10/01/2026", ""]) assert.equal(DayQuery.safeParse({ date }).success, false, date);
-  assert.equal(DayQuery.safeParse({}).success, false);
+  assert.equal(DayQuery.safeParse({}).success, true, "no date means today");
+  assert.equal(DayQuery.safeParse({ date: "2026-10-01", extra: 1 }).success, false);
 });
 
 test("task patch: needs a field, only open or done, moveTo stands alone", () => {
@@ -47,4 +48,30 @@ test("understandBody trims, requires text and enforces the cap", async () => {
   assert.throws(() => body.parse({ text: "   " }));
   assert.throws(() => body.parse({ text: "x".repeat(11) }));
   assert.throws(() => body.parse({ text: "gym", extra: 1 }));
+});
+
+const ID = "00000000-0000-4000-8000-000000000001";
+const NEW_TASK = { title: "Water plants", location: "home", kind: "chore", durationMin: 15, durationSource: "user", fixedStart: null, due: null };
+
+test("day edit: each op is validated, and nothing extra gets through", () => {
+  const ok = (op: unknown) => DayEditBody.safeParse({ dayId: ID, op }).success;
+  assert.equal(ok({ type: "edit", taskId: ID, patch: { durationMin: 90, durationSource: "user" } }), true);
+  assert.equal(ok({ type: "edit", taskId: ID, patch: {} }), false);
+  assert.equal(ok({ type: "edit", taskId: ID, patch: { durationMin: 2 } }), false);
+  assert.equal(ok({ type: "edit", taskId: ID, patch: { status: "done" } }), false);
+  assert.equal(ok({ type: "delete", taskId: ID }), true);
+  assert.equal(ok({ type: "delete", taskId: "nope" }), false);
+  assert.equal(ok({ type: "add", task: NEW_TASK }), true);
+  assert.equal(ok({ type: "add", task: { ...NEW_TASK, title: " " } }), false);
+  assert.equal(ok({ type: "move", taskId: ID, to: "2026-10-05" }), true);
+  assert.equal(ok({ type: "move", taskId: ID, to: "tomorrow" }), false);
+  assert.equal(ok({ type: "bringBack", taskId: ID }), true);
+  assert.equal(ok({ type: "explode" }), false);
+});
+
+test("day undo: a plan version and the tasks as they were", () => {
+  const t = { ...NEW_TASK, id: ID, status: "moved", movedTo: "2026-10-05" };
+  assert.equal(DayUndoBody.safeParse({ dayId: ID, version: 2, tasks: [t] }).success, true);
+  assert.equal(DayUndoBody.safeParse({ dayId: ID, version: 0, tasks: [t] }).success, false);
+  assert.equal(DayUndoBody.safeParse({ dayId: ID, version: 2, tasks: [{ ...t, status: "deleted" }] }).success, false);
 });

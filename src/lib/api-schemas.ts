@@ -21,7 +21,8 @@ export const PresetBody = z
 export type PresetBody = z.infer<typeof PresetBody>;
 
 export const IsoDate = z.string().refine(isIsoDate, "Expected YYYY-MM-DD");
-export const DayQuery = z.object({ date: IsoDate }).strict();
+/** Without a date the server uses today in the user's own timezone. */
+export const DayQuery = z.object({ date: IsoDate.optional() }).strict();
 
 export const UuidParam = z.string().uuid();
 
@@ -71,3 +72,42 @@ export const PlanBody = z
   })
   .strict();
 export type PlanBody = z.infer<typeof PlanBody>;
+
+const EditableFields = z
+  .object({
+    title: z.string().trim().min(1).max(120),
+    location: Location,
+    kind: Kind,
+    durationMin: z.number().int().min(5).max(480),
+    durationSource: z.enum(["user", "preset", "estimated"]),
+    fixedStart: HHMM.nullable(),
+    due: Due.nullable(),
+  })
+  .strict();
+
+/** POST /api/day/edit: one change to today's day. The server applies it, re-plans the unfinished tasks and saves the next plan version. */
+export const DayEditBody = z
+  .object({
+    dayId: z.string().uuid(),
+    op: z.discriminatedUnion("type", [
+      z.object({ type: z.literal("edit"), taskId: z.string().uuid(), patch: EditableFields.partial().refine((v) => Object.keys(v).length > 0, "Send at least one field") }).strict(),
+      z.object({ type: z.literal("delete"), taskId: z.string().uuid() }).strict(),
+      z.object({ type: z.literal("add"), task: EditableFields }).strict(),
+      z.object({ type: z.literal("move"), taskId: z.string().uuid(), to: IsoDate }).strict(),
+      z.object({ type: z.literal("bringBack"), taskId: z.string().uuid() }).strict(),
+    ]),
+  })
+  .strict();
+export type DayEditBody = z.infer<typeof DayEditBody>;
+
+/** POST /api/day/undo: put the tasks back as they were and save plan version `version` again as the newest. */
+export const DayUndoBody = z
+  .object({
+    dayId: z.string().uuid(),
+    version: z.number().int().min(1),
+    tasks: z
+      .array(EditableFields.extend({ id: z.string().uuid(), status: z.enum(["open", "done", "moved"]), movedTo: IsoDate.nullable() }).strict())
+      .max(60),
+  })
+  .strict();
+export type DayUndoBody = z.infer<typeof DayUndoBody>;

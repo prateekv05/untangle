@@ -6,7 +6,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, type Db } from "../client";
 import { aiUsage, days, plans, settings, tasks, users } from "../schema";
-import { DEFAULT_SETTINGS, type Plan, type Settings, type Task } from "../../lib/schemas";
+import { DEFAULT_SETTINGS, Plan as PlanSchema, type Plan, type Settings, type Task } from "../../lib/schemas";
 import { AiLimitError, assertIsoDate, assertMoveTarget, cleanPatch, NotFoundError, rowToTask, type TaskPatch } from "./helpers";
 
 export { AiLimitError, NotFoundError } from "./helpers";
@@ -195,4 +195,65 @@ export async function incrementAiUsage(userId: string, day: string, limit: numbe
     .returning({ calls: aiUsage.calls });
   if (!row) throw new AiLimitError(limit);
   return row.calls;
+}
+
+export type TaskStatus = "open" | "done" | "moved" | "deleted";
+/** A task as the day screen sees it: the domain Task plus where it stands. */
+export type DayTask = Task & { status: Exclude<TaskStatus, "deleted">; movedTo: string | null };
+export type DayState = {
+  day: typeof days.$inferSelect;
+  /** Every task of the day, deleted ones included (undo needs them). */
+  rows: Array<Task & { status: TaskStatus; movedTo: string | null }>;
+  plan: { version: number; snapshot: Plan; source: string; model: string | null } | null;
+};
+
+/** The day by id (only if it is the user's), all its tasks in order, and the latest plan version. */
+export async function getDayState(userId: string, dayId: string, db: Db = getDb()): Promise<DayState | null> {
+  const day = await getDayById(userId, dayId, db);
+  if (!day) return null;
+  const [rows, [plan]] = await Promise.all([
+    db.select().from(tasks).where(eq(tasks.dayId, dayId)).orderBy(tasks.position),
+    db.select().from(plans).where(eq(plans.dayId, dayId)).orderBy(desc(plans.version)).limit(1),
+  ]);
+  return {
+    day,
+    rows: rows.map((r) => ({ ...rowToTask(r), status: r.status, movedTo: r.movedTo })),
+    plan: plan ? { version: plan.version, snapshot: PlanSchema.parse(plan.snapshot), source: plan.source, model: plan.model } : null,
+  };
+}
+
+/** One saved plan version of a day (only if the day is the user's). */
+export async function getPlanVersion(userId: string, dayId: string, version: number, db: Db = getDb()) {
+  if (!(await getDayById(userId, dayId, db))) return null;
+  const [row] = await db.select().from(plans).where(and(eq(plans.dayId, dayId), eq(plans.version, version))).limit(1);
+  return row ? { version: row.version, snapshot: PlanSchema.parse(row.snapshot), source: row.source, model: row.model } : null;
+}
+
+/** Adds a task to the end of an existing day. */
+export async function addTaskToDay(userId: string, dayId: string, task: Omit<Task, "id">, db: Db = getDb()): Promise<Task> {
+  if (!(await getDayById(userId, dayId, db))) throw new NotFoundError("Day");
+  const [{ next }] = await db.select({ next: sql<number>`coalesce(max(${tasks.position}), -1) + 1` }).from(tasks).where(eq(tasks.dayId, dayId));
+  const [row] = await db.insert(tasks).values({ ...task, dayId, position: Number(next) }).returning();
+  return rowToTask(row);
+}
+
+export async function setTaskStatus(userId: string, taskId: string, status: TaskStatus, movedTo: string | null = null, db: Db = getDb()) {
+  return updateTaskStatus(userId, taskId, { status, movedTo: status === "moved" ? movedTo : null }, db);
+}
+
+export type TaskRestore = Task & { status: Exclude<TaskStatus, "deleted">; movedTo: string | null };
+
+/**
+ * Puts the day's tasks back to `restore` exactly. Tasks of the day that are not listed (added since) are deleted.
+ * Every id must belong to the day; the caller has checked that.
+ */
+export async function restoreDayTasks(userId: string, dayId: string, restore: TaskRestore[], db: Db = getDb()): Promise<void> {
+  if (!(await getDayById(userId, dayId, db))) throw new NotFoundError("Day");
+  const listed = new Set(restore.map((t) => t.id));
+  const existing = await db.select({ id: tasks.id, status: tasks.status }).from(tasks).where(eq(tasks.dayId, dayId));
+  const extra = existing.filter((r) => !listed.has(r.id) && r.status !== "deleted").map((r) => r.id);
+  if (extra.length) await db.update(tasks).set({ status: "deleted", movedTo: null }).where(and(eq(tasks.dayId, dayId), inArray(tasks.id, extra)));
+  for (const { id, status, movedTo, ...fields } of restore) {
+    await db.update(tasks).set({ ...fields, status, movedTo: status === "moved" ? movedTo : null }).where(and(eq(tasks.id, id), eq(tasks.dayId, dayId)));
+  }
 }

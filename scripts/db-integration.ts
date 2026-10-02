@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import { makeDb } from "../src/db/client";
-import { AiLimitError, carryOver, createDayWithTasks, getDay, getSettings, getUserById, incrementAiUsage, moveTaskToLater, NotFoundError, savePlan, syncDayTasks, updateTask } from "../src/db/queries";
+import { addTaskToDay, AiLimitError, carryOver, getDayState, getPlanVersion, restoreDayTasks, setTaskStatus, createDayWithTasks, getDay, getSettings, getUserById, incrementAiUsage, moveTaskToLater, NotFoundError, savePlan, syncDayTasks, updateTask } from "../src/db/queries";
 import { clearAuthAttempts, clearPassword, completeOnboarding, findUserByEmail, findUserByGoogleSub, recordAuthAttempt, setPassword, upsertGoogleUser } from "../src/db/queries/account";
 import { deletePreset, listPresets, MAX_PRESETS, PresetLimitError, savePreset, saveSettings } from "../src/db/queries/presets";
 import { users } from "../src/db/schema";
@@ -179,6 +179,37 @@ try {
   ids.push(u4.id);
   await applyMeUpdate(u4.id, { name: "Kai", timezone: "Asia/Tokyo", complete: true }, db);
   assert.deepEqual(await getSettings(u4.id, db), { ...DEFAULT_SETTINGS, timezone: "Asia/Tokyo" });
+
+  // Phase 6: change a saved day, then put it back exactly
+  const d6 = await createDayWithTasks(a.id, "2026-10-09", "dayoff", "x", [
+    { title: "One", location: "home", kind: "chore", durationMin: 30, durationSource: "user", fixedStart: null, due: null },
+    { title: "Two", location: "home", kind: "chore", durationMin: 30, durationSource: "user", fixedStart: null, due: null },
+  ], db);
+  const plan6a = planDay(d6.tasks, DEFAULT_SETTINGS, { mode: "dayoff", minStart: 8 * 60 });
+  await savePlan(a.id, d6.day.id, "initial", null, plan6a, "fallback", null, db);
+  const s0 = (await getDayState(a.id, d6.day.id, db))!;
+  assert.equal(s0.plan?.version, 1);
+  assert.deepEqual(s0.plan?.snapshot, plan6a);
+  assert.equal(await getDayState(b.id, d6.day.id, db), null, "someone else's day");
+  assert.equal(await getPlanVersion(b.id, d6.day.id, 1, db), null);
+  await expectNotFound(addTaskToDay(b.id, d6.day.id, { title: "Sneaky", location: "home", kind: "chore", durationMin: 5, durationSource: "user", fixedStart: null, due: null }, db));
+  await expectNotFound(setTaskStatus(b.id, d6.tasks[0].id, "done", null, db));
+
+  const before = s0.rows.map((r) => ({ ...r, status: r.status as "open", movedTo: null }));
+  const added = await addTaskToDay(a.id, d6.day.id, { title: "Three", location: "home", kind: "chore", durationMin: 15, durationSource: "user", fixedStart: null, due: null }, db);
+  await setTaskStatus(a.id, d6.tasks[0].id, "moved", "2026-10-10", db);
+  await setTaskStatus(a.id, d6.tasks[1].id, "deleted", null, db);
+  const s1 = (await getDayState(a.id, d6.day.id, db))!;
+  assert.deepEqual(s1.rows.map((r) => [r.title, r.status, r.movedTo]), [["One", "moved", "2026-10-10"], ["Two", "deleted", null], ["Three", "open", null]]);
+  assert.equal(s1.rows[2].id, added.id);
+
+  await restoreDayTasks(a.id, d6.day.id, before, db);
+  const s2 = (await getDayState(a.id, d6.day.id, db))!;
+  assert.deepEqual(s2.rows.filter((r) => r.status !== "deleted").map((r) => [r.title, r.status, r.movedTo]), [["One", "open", null], ["Two", "open", null]]);
+  assert.equal(s2.rows.find((r) => r.id === added.id)?.status, "deleted", "tasks added since are removed");
+  const v6 = (await savePlan(a.id, d6.day.id, "edit", "undo", (await getPlanVersion(a.id, d6.day.id, 1, db))!.snapshot, "fallback", null, db)).version;
+  assert.equal(v6, 2);
+  assert.deepEqual((await getDayState(a.id, d6.day.id, db))!.plan?.snapshot, plan6a, "the restored plan is identical");
 
   console.log("db integration: all passed");
 } finally {

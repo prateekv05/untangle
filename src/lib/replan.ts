@@ -99,13 +99,14 @@ const fmtMin = (n: number) => (n % 60 === 0 ? `${n / 60} h` : n > 60 ? `${Math.f
  * "Here is what I changed": one first-person line per real change, written from the old and new plans (not by the model),
  * so every line is true. At most 6.
  */
-export function changeLines(prev: Plan | null, next: Plan, titles: Map<string, string>, was: Record<string, string>, limits: ReplanLimits, newEventIds: string[]): string[] {
+export function changeLines(prev: Plan | null, next: Plan, titles: Map<string, string>, was: Record<string, string>, limits: ReplanLimits, newEventIds: string[], movedIds: string[] = []): string[] {
   const name = (id: string) => titles.get(id) ?? "That task";
   const lines: string[] = [];
   for (const id of newEventIds) {
     const b = next.blocks.find((x) => x.taskId === id);
     if (b) lines.push(`${name(id)} is in at ${b.start}, and the rest works around it`);
   }
+  for (const id of movedIds) lines.push(`${name(id)} moves to tomorrow`);
   for (const [id, mins] of Object.entries(limits.durationOverrides)) lines.push(`${name(id)} gets ${fmtMin(mins)}, what is left of it`);
   if (limits.capacityMin) lines.push(`Planned for your ${fmtMin(limits.capacityMin)}, highest priority first`);
   if (limits.lighterAfter != null) lines.push(`Kept the time after ${toHHMM(limits.lighterAfter)} light`);

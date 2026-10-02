@@ -13,3 +13,15 @@ export type DayView = {
   model: string | null;
   plannedAt: string;
 };
+
+/** What POST /api/replan returns: the new day plus what changed, for the "Here is what I changed" card and the was-pills. */
+export type ReplanView = DayView & {
+  changes: {
+    /** HH:MM the day was rebuilt at. */
+    at: string;
+    /** Previous start per task id. */
+    was: Record<string, string>;
+    /** "Here is what I changed", one line each. */
+    lines: string[];
+  };
+};

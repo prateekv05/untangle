@@ -111,3 +111,6 @@ export const DayUndoBody = z
   })
   .strict();
 export type DayUndoBody = z.infer<typeof DayUndoBody>;
+
+/** POST /api/replan: the day and what the user said changed. The length cap comes from MAX_DUMP_CHARS, as for the dump. */
+export const replanBody = (maxChars: number) => z.object({ dayId: z.string().uuid(), instruction: z.string().trim().min(1).max(maxChars) }).strict();

@@ -115,3 +115,11 @@ test("dropping a must-finish task is an error", () => {
   const errs = validatePlan(dropB, input.tasks, input.settings, { mode: "dayoff", mustFinishTaskIds: ["b"] });
   assert.ok(errs.some((e) => /must be finished/.test(e)));
 });
+
+test("dropping a task fixed at a future time is an error, but a past one may go", () => {
+  const meeting = task("m", { kind: "fixed", fixedStart: "14:00" });
+  const tasks = [task("a"), meeting];
+  const plan: Plan = { blocks: [{ taskId: "a", start: "09:00", durationMin: 30, outingId: null, reason: "r", hop: null }], outings: [], decisions: [], dropped: [{ taskId: "m", why: "later" }], note: null };
+  assert.ok(validatePlan(plan, tasks, input.settings, { mode: "dayoff", minStart: 11 * 60 }).some((e) => /cannot be dropped/.test(e)));
+  assert.ok(!validatePlan(plan, tasks, input.settings, { mode: "dayoff", minStart: 15 * 60 }).some((e) => /cannot be dropped/.test(e)));
+});

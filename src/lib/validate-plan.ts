@@ -97,6 +97,9 @@ export function validatePlan(plan: Plan, tasks: Task[], s: Settings, ctx: Valida
     if (late > LIGHT_LIMIT_MIN) errs.push(`${late} min of work starts after the lighter time; keep it to about 90 min.`);
   }
   plan.dropped.forEach((d) => {
+    const t = byId.get(d.taskId);
+    // A time the user gave is a commitment: it can only fall out of the day once that time has passed.
+    if (t?.fixedStart && toMin(t.fixedStart) >= (ctx.minStart ?? 0)) errs.push(`"${t.title}" is fixed at ${t.fixedStart} and cannot be dropped.`);
     if (ctx.mustFinishTaskIds?.includes(d.taskId)) errs.push(`"${byId.get(d.taskId)?.title}" must be finished today and cannot be dropped.`);
   });
 

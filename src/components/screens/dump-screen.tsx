@@ -12,9 +12,9 @@ const PLACEHOLDER = "SQL assignment, gym, groceries, call Mom, send resume to Sa
 
 export const countLabel = (n: number): string => (n === 0 ? "Nothing yet" : n === 1 ? "1 thing so far" : `${n} things so far`);
 
-export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours, presets, carried = [], onCarry, notice, examples, onExample, name, offline }: {
+export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours, presets, carried = [], onCarry, notice, onRetry, examples, onExample, name, offline }: {
   text: string; onText: (t: string) => void; onMic: () => void; onSubmit: () => void; onSettings: () => void; onYours: () => void;
-  presets: Preset[]; carried?: string[]; onCarry?: (title: string) => void; notice?: string | null;
+  presets: Preset[]; carried?: string[]; onCarry?: (title: string) => void; notice?: string | null; onRetry?: () => void;
   examples?: { label: string; text: string }[]; onExample?: (text: string) => void; name?: string | null; offline?: boolean;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
@@ -56,7 +56,12 @@ export function DumpScreen({ text, onText, onMic, onSubmit, onSettings, onYours,
             </button>
           </div>
         </div>
-        {notice && <p id={noticeId} role="status" className="m-0 mt-2 text-sm font-medium text-danger">{notice}</p>}
+        {notice && (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p id={noticeId} role="status" className="m-0 text-sm font-medium text-danger">{notice}</p>
+            {onRetry && <Button variant="quiet" disabled={offline} onClick={onRetry}>Retry</Button>}
+          </div>
+        )}
         <p className="mb-2 mt-[18px] text-[13px] font-medium leading-[18px] text-ink-muted">Quick starts, optional</p>
         <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
           {chips.map((c) => <Chip key={c} small onClick={() => insert(c)}>{c}</Chip>)}

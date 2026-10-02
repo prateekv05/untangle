@@ -48,3 +48,18 @@ test.describe("real model", () => {
     expect(day2.day.tasks).toHaveLength(1);
   });
 });
+
+test("a failed read offers Retry, and the daily limit does not", async ({ page }) => {
+  let calls = 0;
+  await page.route("**/api/understand", (route) => { calls++; return route.fulfill({ status: 502, json: { error: "understand_failed" } }); });
+  await openDump(page);
+  await page.getByRole("textbox", { name: "What's on your mind?" }).fill(EXAMPLE);
+  await page.getByRole("button", { name: "Untangle my day" }).click();
+  await page.getByRole("button", { name: "Retry" }).click();
+  await expect.poll(() => calls).toBe(2);
+  await page.unroute("**/api/understand");
+  await page.route("**/api/understand", (route) => route.fulfill({ status: 429, json: { error: "daily_limit" } }));
+  await page.getByRole("button", { name: "Untangle my day" }).click();
+  await expect(page.getByText(/today's limit/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0);
+});

@@ -27,6 +27,7 @@ import { PasswordSheet } from "./sheets/password-sheet";
 import { PresetsSheet } from "./sheets/presets-sheet";
 import { ReplanSheet } from "./sheets/replan-sheet";
 import { SettingsSheet } from "./sheets/settings-sheet";
+import { BootSkeleton } from "./boot-skeleton";
 import { OfflineNote } from "./offline-note";
 import { Toast } from "./toast";
 
@@ -53,7 +54,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
   const demo = new URLSearchParams(search).get("demo") === "1";
   const offline = !useOnline();
   const [micOnOpen, setMicOnOpen] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ text: string; retry: boolean } | null>(null);
   const [taken, setTaken] = useState<string[]>([]);
   const [hasPassword, setHasPassword] = useState(false);
   // Settings open only once the account's own values are in, so an early tap cannot save defaults over them.
@@ -152,9 +153,11 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
       .catch((e) => {
         if (run !== understandRun.current) return;
         // The text stays in the box. Nothing here is a dead end: the user can try again straight away.
-        setNotice(e instanceof ApiError && e.status === 429
-          ? "That's today's limit for reading lists. Your text is saved. Try again tomorrow."
-          : "I couldn't read that just now. Your text is saved. Try again.");
+        const limit = e instanceof ApiError && e.status === 429;
+        setNotice({
+          text: limit ? "That's today's limit for reading lists. Your text is saved. Try again tomorrow." : "I couldn't read that just now. Your text is saved. Try again.",
+          retry: !limit, // trying again tomorrow is not a button
+        });
         dispatch({ type: "screen", screen: "dump" });
       });
   };
@@ -300,7 +303,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
 
   let screen;
   if (!booted) {
-    screen = <div className="min-h-dvh" aria-busy="true" />;
+    screen = <BootSkeleton />;
   } else if (s.screen === "listening") {
     screen = (
       <ListeningScreen
@@ -353,7 +356,7 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
         onMic={() => dispatch({ type: "screen", screen: "listening" })}
         onSubmit={submitDump} onSettings={openSettings}
         onYours={() => dispatch({ type: "sheet", sheet: { type: "presets" } })}
-        presets={s.presets} notice={notice} name={name} offline={offline}
+        presets={s.presets} notice={notice?.text} onRetry={notice?.retry ? submitDump : undefined} name={name} offline={offline}
         carried={carried} onCarry={(title) => { dispatch({ type: "text", text: `${s.text.trim() ? `${s.text.trim()}\n` : ""}${title}` }); setTaken((t) => [...t, title]); }}
         examples={demo ? EXAMPLES : undefined} onExample={(text) => dispatch({ type: "text", text })}
       />

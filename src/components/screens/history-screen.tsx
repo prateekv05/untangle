@@ -16,7 +16,7 @@ type Load<T> = { state: "loading" } | { state: "failed" } | { state: "ready"; va
 export function HistoryScreen({ onClose }: { onClose: () => void }) {
   const [openId, setOpenId] = useState<string | null>(null);
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-ground" role="dialog" aria-modal="true" aria-label="Past days">
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-ground" role="dialog" aria-modal="true" aria-label="History">
       <div className="mx-auto min-h-dvh w-full max-w-[430px]">
         {openId ? <DayView dayId={openId} onBack={() => setOpenId(null)} /> : <DayList onOpen={setOpenId} onClose={onClose} />}
       </div>
@@ -53,12 +53,12 @@ function DayList({ onOpen, onClose }: { onOpen: (id: string) => void; onClose: (
     <>
       <BackBar label="Back" onBack={onClose} />
       <main className="px-5 pb-10 pt-[22px]">
-        <h1 className="m-0 text-[32px] font-bold leading-9 tracking-[-0.02em]">Past days</h1>
+        <h1 className="m-0 text-[32px] font-bold leading-9 tracking-[-0.02em]">History</h1>
         <p className="voice mb-[18px] mt-2 text-ink-muted">Your days, as they ended up.</p>
-        {res.state === "loading" && <div aria-busy="true" aria-label="Loading past days" className="late flex flex-col gap-2"><div className="h-[76px] rounded-md bg-surface-soft" /><div className="h-[76px] rounded-md bg-surface-soft" /><div className="h-[76px] rounded-md bg-surface-soft" /></div>}
+        {res.state === "loading" && <div aria-busy="true" aria-label="Loading your history" className="late flex flex-col gap-2"><div className="h-[76px] rounded-md bg-surface-soft" /><div className="h-[76px] rounded-md bg-surface-soft" /><div className="h-[76px] rounded-md bg-surface-soft" /></div>}
         {res.state === "failed" && (
           <div>
-            <p role="alert" className="voice m-0 text-ask-ink">I couldn&apos;t load your past days. Check your connection, then try again.</p>
+            <p role="alert" className="voice m-0 text-ask-ink">I couldn&apos;t load your history. Check your connection, then try again.</p>
             <div className="mt-4"><Button onClick={retry}>Try again</Button></div>
           </div>
         )}
@@ -88,7 +88,7 @@ function DayView({ dayId, onBack }: { dayId: string; onBack: () => void }) {
   const [res, retry] = useLoad<HistoryDay>(load);
   return (
     <>
-      <BackBar label="Past days" onBack={onBack} />
+      <BackBar label="History" onBack={onBack} />
       <main className="px-5 pb-10 pt-[22px]">
         {res.state === "loading" && <div aria-busy="true" aria-label="Loading this day" className="late flex flex-col gap-2"><div className="h-8 w-3/4 rounded-sm bg-surface-soft" /><div className="mt-3 h-[96px] rounded-md bg-surface-soft" /><div className="h-[96px] rounded-md bg-surface-soft" /></div>}
         {res.state === "failed" && (

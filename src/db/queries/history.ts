@@ -3,11 +3,11 @@ import { sql } from "drizzle-orm";
 import { getDb, type Db } from "../client";
 import { getDay, getDayById } from "./index";
 
-export const HISTORY_LIMIT = 90;
+export const HISTORY_LIMIT = 1000;
 
 export type HistoryItem = { dayId: string; date: string; mode: "workday" | "dayoff"; total: number; done: number; moved: number };
 
-/** The user's planned days, newest first. A day that never got a plan (a dump left on Understand) is not history. */
+/** The user's planned days, newest first, all of them (a row each, so a thousand is years). A day that never got a plan (a dump left on Understand) is not history. */
 export async function listHistory(userId: string, db: Db = getDb()): Promise<HistoryItem[]> {
   const result = await db.execute(sql`
     select d.id as "dayId", to_char(d.date, 'YYYY-MM-DD') as date, d.mode,

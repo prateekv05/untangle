@@ -62,7 +62,7 @@ export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSa
           Presets <span className="font-medium text-ink-muted">{presetCount === 0 ? "None yet" : presetCount === 1 ? "1 yours" : `${presetCount} yours`}</span>
         </button>
         <button type="button" onClick={onHistory} className="mb-4 flex min-h-[52px] w-full items-center justify-between rounded-md bg-surface-soft px-4 text-left font-semibold">
-          Past days <span className="font-medium text-ink-muted">View</span>
+          History <span className="font-medium text-ink-muted">All days</span>
         </button>
         <p className={label}>Appearance</p>
         <SegmentedControl<ThemePref> label="Appearance" value={pref} onChange={(v) => { setPref(v); setThemePreference(v); }} options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "System" }]} />

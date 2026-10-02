@@ -39,7 +39,7 @@ Extraction rules (also in the prompt):
 - `durationMin`: a sensible estimate. `durationSource`: `"user"` if the user said a length, `"preset"` if a preset supplied it, else `"estimated"`.
 - `fixedStart`: only if the user said a time ("dentist at 5pm" → "17:00").
 - `due`: only if the user said so ("due tomorrow"); otherwise `null`.
-- `questions`: add a `due` question for assignment-like deep tasks with `due: null`; a `duration` question for `health` and `deep` tasks with estimated durations when the answer would change the plan; a `time` question for `fixed` tasks with no `fixedStart`. Max 3, most plan-changing first.
+- `questions`: add a `due` question for assignment-like deep tasks with `due: null`; a `duration` question for `health` tasks with estimated durations (focus work keeps its estimate, shown as estimated, until the user sets it); a `time` question for `fixed` tasks with no `fixedStart`. Max 3, most plan-changing first.
 - `groupings`: tasks that belong together (all `outside` tasks, if two or more) with a one-sentence `why`.
 - `planFor`: `"tomorrow"` if the user said tomorrow, else `"today"`.
 

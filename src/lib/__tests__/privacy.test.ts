@@ -17,10 +17,11 @@ test("client components never read server secrets or the environment", () => {
   assert.deepEqual(bad.map((f) => f.path), []);
 });
 
-test("the only logging is the name-only API error line", () => {
+test("the only logging is the name-only API error line and the AI call log", () => {
   const logs = files.flatMap((f) => f.text.split("\n").filter((l) => /console\.(log|error|warn|info|debug)/.test(l)).map((l) => `${f.path}: ${l.trim()}`));
-  assert.equal(logs.length, 1, logs.join("\n"));
-  assert.match(logs[0], /^lib\/api\.ts: console\.error\("api error:", e instanceof Error \? e\.name : "unknown"\);/);
+  assert.equal(logs.length, 2, logs.join("\n"));
+  assert.match(logs[0], /^lib\/ai\/log\.ts: export const logAiCall = \(entry: AiLog\): void => console\.log\(JSON\.stringify\(entry\)\);/);
+  assert.match(logs[1], /^lib\/api\.ts: console\.error\("api error:", e instanceof Error \? e\.name : "unknown"\);/);
 });
 
 test("prompts and AI code never mention the user's name or gender", () => {

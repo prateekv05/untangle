@@ -6,6 +6,7 @@ import { logAiCall } from "./log";
 import type { PlanGeneration, PlanGenerator, PlanInput, PlanRepair } from "./plan";
 import { planDay } from "../planner";
 import type { Plan } from "../schemas";
+import { toMin } from "../time";
 import { validatePlan } from "../validate-plan";
 
 export type PipelineResult = {
@@ -31,7 +32,12 @@ export async function runPlanPipeline(input: PlanInput, generate: PlanGenerator,
   let failure: string | undefined;
 
   const add = (a: number | null, b: number | null) => (a === null && b === null ? null : (a ?? 0) + (b ?? 0));
-  const check = (plan: Plan) => validatePlan(plan, input.tasks, input.settings, { mode: input.mode, minStart: input.planFrom });
+  const kept = input.keptBlocks ?? [];
+  const keptTaskIds = kept.map((b) => b.taskId);
+  // The model plans the open tasks only; finished blocks are put back untouched before anything is checked or shown.
+  const withKept = (plan: Plan): Plan =>
+    kept.length ? { ...plan, blocks: [...kept, ...plan.blocks].sort((a, b) => toMin(a.start) - toMin(b.start)) } : plan;
+  const check = (plan: Plan) => validatePlan(plan, input.tasks, input.settings, { mode: input.mode, minStart: input.planFrom, keptTaskIds });
 
   for (let attempt = 0; attempt < 2; attempt++) {
     let g: PlanGeneration;
@@ -45,9 +51,10 @@ export async function runPlanPipeline(input: PlanInput, generate: PlanGenerator,
     lastModel = g.model;
     inputTokens = add(inputTokens, g.inputTokens);
     outputTokens = add(outputTokens, g.outputTokens);
-    const errors = check(g.plan);
+    const merged = withKept(g.plan);
+    const errors = check(merged);
     if (errors.length === 0) {
-      const result: PipelineResult = { plan: g.plan, source: "llm", model: g.model, repaired: attempt > 0, latencyMs: Date.now() - started, inputTokens, outputTokens, validatorErrors };
+      const result: PipelineResult = { plan: merged, source: "llm", model: g.model, repaired: attempt > 0, latencyMs: Date.now() - started, inputTokens, outputTokens, validatorErrors };
       log(route, result);
       return result;
     }
@@ -55,7 +62,7 @@ export async function runPlanPipeline(input: PlanInput, generate: PlanGenerator,
     repair = { previous: g.plan, errors };
   }
 
-  const plan = planDay(input.tasks, input.settings, { mode: input.mode, minStart: input.planFrom });
+  const plan = planDay(input.tasks, input.settings, { mode: input.mode, minStart: input.planFrom, fixedBlocks: kept });
   const result: PipelineResult = { plan, source: "fallback", model: null, repaired: false, latencyMs: Date.now() - started, inputTokens, outputTokens, validatorErrors };
   log(route, result, lastModel, failure);
   return result;

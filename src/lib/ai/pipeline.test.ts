@@ -67,3 +67,20 @@ test("the plan message carries tasks, mode and planFrom, and the errors when rep
   assert.doesNotMatch(m, /errors/);
   assert.match(buildPlanMessage(input, { previous: good, errors: ["x overlaps y"] }), /x overlaps y/);
 });
+
+test("finished blocks are kept exactly, the model plans only the open tasks, and the fallback keeps them too", async () => {
+  const tasks = [task("a"), task("b"), task("c", { durationMin: 45 })];
+  const first = planDay(tasks, DEFAULT_SETTINGS, { mode: "dayoff", minStart: 8 * 60 });
+  const keptBlocks = first.blocks.filter((b) => b.taskId === "a");
+  const rebuilt: PlanInput = { tasks, settings: DEFAULT_SETTINGS, mode: "dayoff", planFrom: 10 * 60, keptBlocks };
+  assert.ok(!buildPlanMessage(rebuilt).includes('"id":"a"'), "the model is not asked to place a finished task");
+  assert.ok(buildPlanMessage(rebuilt).includes("keptBlocks"));
+  const openOnly = planDay(tasks.filter((t) => t.id !== "a"), DEFAULT_SETTINGS, { mode: "dayoff", minStart: 10 * 60 });
+  const r = await runPlanPipeline(rebuilt, gen(openOnly));
+  assert.equal(r.source, "llm");
+  assert.deepEqual(r.plan.blocks.filter((b) => b.taskId === "a"), keptBlocks);
+  const fb = await runPlanPipeline(rebuilt, gen(broken, broken));
+  assert.equal(fb.source, "fallback");
+  assert.deepEqual(fb.plan.blocks.filter((b) => b.taskId === "a"), keptBlocks);
+  assert.ok(fb.plan.blocks.filter((b) => b.taskId !== "a").every((b) => b.start >= "10:00"));
+});

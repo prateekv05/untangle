@@ -14,7 +14,7 @@ import { Decisions } from "../decisions";
 import { Icon } from "../icon";
 import { InstallHint } from "../install-hint";
 import { Outing } from "../outing";
-import { SegmentedControl } from "../segmented-control";
+import { DayPicker } from "../day-picker";
 import { TaskBlock } from "../task-block";
 import { UpcomingDay } from "../upcoming-day";
 import { NowMarker, ThreadHop, ThreadMarker, ThreadRow } from "../thread";
@@ -102,18 +102,15 @@ export function PlanScreen(p: {
 
   const open = p.plan.blocks.length === 0;
   const names = { today: "today", tomorrow: "tomorrow", dayafter: dateHeading(addDaysTo(p.today, 2)).split(",")[0] };
-  const tabs = (
-    <div className="mb-4">
-      <SegmentedControl<PlanForDay> label="Day" value={view} onChange={setView} options={[{ value: "today", label: "Today" }, { value: "tomorrow", label: "Tomorrow" }, { value: "dayafter", label: names.dayafter }]} />
-    </div>
-  );
+  const dayOptions: { value: PlanForDay; label: string }[] = [{ value: "today", label: "Today" }, { value: "tomorrow", label: "Tomorrow" }, { value: "dayafter", label: names.dayafter }];
+  const picker = (heading: string) => <DayPicker heading={heading} value={view} options={dayOptions} onChange={setView} />;
   if (view !== "today") {
     const offset = view === "tomorrow" ? 1 : 2;
     return (
       <div className="min-h-dvh pb-10">
         <TopBar onSettings={p.onSettings} />
         <main className="px-5 pt-[22px]">
-          {tabs}
+          <div className="mb-3">{picker(dateHeading(addDaysTo(p.today, view === "tomorrow" ? 1 : 2)))}</div>
           <UpcomingDay key={view} date={addDays(p.todayIso, offset)} name={names[view]} onAdd={() => p.onPlanDay(view)} />
         </main>
       </div>
@@ -124,8 +121,7 @@ export function PlanScreen(p: {
       <TopBar onSettings={p.onSettings} />
       <main>
         <div className="px-5 pt-[22px]">
-          {tabs}
-          <h1 className="m-0 text-[28px] font-bold leading-8 tracking-[-0.02em]">{p.replan ? `Re-planned at ${p.replan.at}` : dateHeading(p.today)}</h1>
+          {picker(p.replan ? `Re-planned at ${p.replan.at}` : dateHeading(p.today))}
           <p className="m-0 mt-0.5 text-sm font-medium leading-5 text-ink-muted">
             {p.replan ? <>You said: &ldquo;{p.replan.said}&rdquo;</> : `${p.mode === "dayoff" ? "Day off" : "Workday"}. Planned at ${p.plannedAt}.`}
           </p>

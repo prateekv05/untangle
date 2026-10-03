@@ -6,9 +6,9 @@ const out = { signedIn: false, onboarded: false };
 const fresh = { signedIn: true, onboarded: false };
 const done = { signedIn: true, onboarded: true };
 
-test("signed out sees only Welcome", () => {
+test("signed out sees only the landing page and Welcome", () => {
   assert.equal(redirectFor("/welcome", out), null);
-  assert.equal(redirectFor("/", out), "/welcome");
+  assert.equal(redirectFor("/", out), null);
   assert.equal(redirectFor("/dev/gallery", out), "/welcome");
   assert.equal(redirectFor("/welcome/name", out), "/welcome");
 });

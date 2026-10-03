@@ -7,12 +7,12 @@ export type GateState = { signedIn: boolean; onboarded: boolean };
 
 /**
  * Where a request for `pathname` should be sent instead, or null to let it through.
- * Signed out: only Welcome. Signed in, not onboarded: only the onboarding steps. Onboarded: never Welcome or onboarding.
+ * Signed out: only the landing page at "/" and Welcome. Signed in, not onboarded: only the onboarding steps. Onboarded: never Welcome or onboarding.
  */
 export function redirectFor(pathname: string, { signedIn, onboarded }: GateState): string | null {
   const isWelcome = pathname === WELCOME_PATH || pathname === `${WELCOME_PATH}/`;
   const isOnboarding = pathname.startsWith(`${WELCOME_PATH}/`) && !isWelcome;
-  if (!signedIn) return isWelcome ? null : WELCOME_PATH;
+  if (!signedIn) return isWelcome || pathname === "/" ? null : WELCOME_PATH;
   if (!onboarded) return isOnboarding ? null : ONBOARDING_START;
   return isWelcome || isOnboarding ? "/" : null;
 }

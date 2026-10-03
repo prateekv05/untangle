@@ -38,6 +38,10 @@
   --font-serif: var(--font-serif);
 }
 
+/* Declared so the browser's own forced dark mode (Android Chrome "auto dark") leaves the page alone: the theme is ours to choose. */
+:root { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
+
 html {
   background: var(--ground);
   color: var(--ink);

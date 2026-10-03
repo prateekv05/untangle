@@ -105,3 +105,10 @@ export const drafts = pgTable("drafts", {
   payload: jsonb("payload").$type<DraftPayload>().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Why people deleted their account. Deliberately has no user reference: nothing here can be tied back to a person. */
+export const accountFeedback = pgTable("account_feedback", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reason: text("reason").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

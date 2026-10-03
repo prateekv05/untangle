@@ -19,6 +19,7 @@ users 1──* ai_usage (per day)
 | `tasks` | extracted tasks | `status`: open, done, moved, deleted. `moved_to` set when moved. `fixed_start` "HH:MM". |
 | `plans` | every plan version | `snapshot` is the validated `Plan` JSON. `version` 1 = initial; each re-plan +1. `source` llm or fallback. `model` = `provider:model-id` that produced it (null for fallback). |
 | `ai_usage` | calls per user per day | enforce `DAILY_AI_CALL_LIMIT` |
+| `account_feedback` | optional reason given when deleting an account | no user reference, so it cannot be traced back |
 
 ## Queries to implement (`src/db/queries/`)
 

@@ -21,7 +21,8 @@ export type SheetState =
   | { type: "newdump" }
   | { type: "settings" }
   | { type: "presets" }
-  | { type: "password" };
+  | { type: "password" }
+  | { type: "deleteAccount" };
 
 export type Grouping = UnderstandResult["groupings"][number];
 /** `to` is the ISO date the task was moved to. */

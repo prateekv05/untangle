@@ -24,6 +24,7 @@ import { UnderstandScreen } from "./screens/understand-screen";
 import { EditSheet } from "./sheets/edit-sheet";
 import { MoveSheet } from "./sheets/move-sheet";
 import { NewDumpSheet } from "./sheets/new-dump-sheet";
+import { DeleteAccountSheet } from "./sheets/delete-account-sheet";
 import { PasswordSheet } from "./sheets/password-sheet";
 import { PresetsSheet } from "./sheets/presets-sheet";
 import { ReplanSheet } from "./sheets/replan-sheet";
@@ -404,8 +405,9 @@ export function UntangleApp({ name = null }: { name?: string | null }) {
       )}
       {s.sheet?.type === "newdump" && <NewDumpSheet onClose={closeSheet} onConfirm={() => dispatch({ type: "newdump" })} />}
       {s.sheet?.type === "settings" && account !== "loading" && (
-        <SettingsSheet loadFailed={account === "failed"} onRetry={retryLoad} settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onHistory={() => { closeSheet(); setHistoryOpen(true); }} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onSave={saveSettings} />
+        <SettingsSheet loadFailed={account === "failed"} onRetry={retryLoad} settings={s.settings} presetCount={s.presets.length} onClose={closeSheet} onPresets={() => dispatch({ type: "sheet", sheet: { type: "presets" } })} onHistory={() => { closeSheet(); setHistoryOpen(true); }} onPassword={(has) => { setHasPassword(has); dispatch({ type: "sheet", sheet: { type: "password" } }); }} onDeleteAccount={() => dispatch({ type: "sheet", sheet: { type: "deleteAccount" } })} onSave={saveSettings} />
       )}
+      {s.sheet?.type === "deleteAccount" && <DeleteAccountSheet onClose={() => dispatch({ type: "sheet", sheet: { type: "settings" } })} />}
       {s.sheet?.type === "password" && <PasswordSheet hasPassword={hasPassword} onClose={() => dispatch({ type: "sheet", sheet: { type: "settings" } })} onDone={(text) => { dispatch({ type: "sheet", sheet: { type: "settings" } }); dispatch({ type: "toast", text }); }} />}
       {s.sheet?.type === "presets" && <PresetsSheet presets={s.presets} onAdd={addPreset} onRemove={removePreset} onClose={closeSheet} />}
       {historyOpen && <HistoryScreen today={localClock(s.settings.timezone).date} onClose={() => setHistoryOpen(false)} />}

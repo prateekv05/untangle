@@ -20,7 +20,7 @@ const zones = (current: string): string[] => {
 };
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSave, onPresets, onHistory, onPassword, onClose }: { loadFailed: boolean; onRetry: () => void; settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onHistory: () => void; onPassword: (hasPassword: boolean) => void; onClose: () => void }) {
+export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSave, onPresets, onHistory, onPassword, onDeleteAccount, onClose }: { loadFailed: boolean; onRetry: () => void; settings: Settings; presetCount: number; onSave: (s: Settings) => void; onPresets: () => void; onHistory: () => void; onPassword: (hasPassword: boolean) => void; onDeleteAccount: () => void; onClose: () => void }) {
   const [s, setS] = useState(settings);
   const [pref, setPref] = useState<ThemePref>(() => themePreference());
   const id = useId();
@@ -35,7 +35,7 @@ export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSa
   const toggleDay = (d: number) => setS({ ...s, workDays: s.workDays.includes(d) ? s.workDays.filter((x) => x !== d) : [...s.workDays, d].sort() });
   return (
     <Sheet title="Settings" onClose={onClose} tall>
-      <AccountSection onPassword={onPassword} />
+      <AccountSection onPassword={onPassword} onDelete={onDeleteAccount} />
       {loadFailed ? (
         <div className="mt-2">
           <p role="alert" className="voice m-0 text-ask-ink">I couldn&apos;t load your settings. Check your connection, then try again.</p>

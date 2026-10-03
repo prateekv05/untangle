@@ -8,7 +8,7 @@ import { TextField } from "./text-field";
 type Me = { email: string; name: string | null; hasPassword: boolean };
 
 /** Account row of the Settings sheet: editable name, email, optional password, sign out. */
-export function AccountSection({ onPassword }: { onPassword: (hasPassword: boolean) => void }) {
+export function AccountSection({ onPassword, onDelete }: { onPassword: (hasPassword: boolean) => void; onDelete: () => void }) {
   const [me, setMe] = useState<Me | null>(null);
   const [name, setName] = useState("");
   const [nameFailed, setNameFailed] = useState(false);
@@ -67,6 +67,9 @@ export function AccountSection({ onPassword }: { onPassword: (hasPassword: boole
       {!me.hasPassword && <p className="voice-sm m-0 mt-2 text-ink-muted">Optional. You can always sign in with Google.</p>}
       <div className="mt-2 flex justify-center">
         <Button variant="quiet" onClick={signOut} disabled={signingOut}>Sign out</Button>
+      </div>
+      <div className="flex justify-center">
+        <Button variant="danger" onClick={onDelete} disabled={signingOut}>Delete account</Button>
       </div>
     </section>
   );

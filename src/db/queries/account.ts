@@ -1,7 +1,7 @@
 /** Account queries (Phase 3). Like the rest of src/db/queries: explicit ids, optional Db last, no session access. */
 import { eq, sql } from "drizzle-orm";
 import { getDb, type Db } from "../client";
-import { authAttempts, settings, users } from "../schema";
+import { accountFeedback, authAttempts, settings, users } from "../schema";
 import { normalizeEmail, NotFoundError, windowStart, type Gender } from "./helpers";
 
 export async function findUserByGoogleSub(sub: string, db: Db = getDb()) {
@@ -84,6 +84,17 @@ export async function recordAuthAttempt(
     .returning({ count: authAttempts.count });
   if (row) return { allowed: true, count: row.count };
   return { allowed: false, count: opts.limit };
+}
+
+/**
+ * Removes the user and everything they own. Settings, presets, days (and through them tasks and plans), AI usage and the draft
+ * all cascade from the users row. Sign-in attempt counters are keyed by email, so those go too.
+ */
+export async function deleteAccount(userId: string, reason?: string, db: Db = getDb()) {
+  const [row] = await db.delete(users).where(eq(users.id, userId)).returning({ email: users.email });
+  if (!row) throw new NotFoundError("User");
+  await db.delete(authAttempts).where(eq(authAttempts.key, `email:${row.email}`));
+  if (reason) await db.insert(accountFeedback).values({ reason }).catch(() => {}); // after the delete, with no user id so it cannot be traced back; never fails a delete that already happened
 }
 
 /** A successful sign-in clears the failure count for that key. */

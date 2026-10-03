@@ -18,5 +18,8 @@ export const MeUpdate = z
   .refine((v) => Object.keys(v).length > 0, "Send at least one field");
 export type MeUpdate = z.infer<typeof MeUpdate>;
 
+export const DeleteAccount = z.object({ reason: z.string().trim().max(500).optional() }).strict();
+export type DeleteAccount = z.infer<typeof DeleteAccount>;
+
 export const PasswordUpdate = z.object({ password: z.string().min(MIN_PASSWORD_LENGTH, `At least ${MIN_PASSWORD_LENGTH} characters`).max(200) }).strict();
 export type PasswordUpdate = z.infer<typeof PasswordUpdate>;

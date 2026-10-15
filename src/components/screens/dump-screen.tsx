@@ -15,7 +15,7 @@ import { TopBar } from "../top-bar";
 import { Waveform } from "../waveform";
 
 const QUICK = ["Call", "Buy", "Go to", "Order", "Email"].map((n) => BUILT_IN_PRESETS.find((p) => p.phrase === n)!);
-const PLACEHOLDER = "Finish the Q3 report, reply to Priya, prep for the 2pm client call, gym, groceries, call Mom, book the dentist…";
+const PLACEHOLDER = "Finish the Q3 report, reply to Emily, prep for the 2pm client call, gym, groceries, call Mom, book the dentist…";
 
 export const VOICE_LIMIT_SECONDS = 120;
 const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;

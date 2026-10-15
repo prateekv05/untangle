@@ -9,7 +9,7 @@ import "./landing.css";
 
 const FAQ: { q: string; voice?: string; a: string }[] = [
   { q: "Do you keep my voice recordings?", voice: "Your voice is turned into text and then discarded.", a: "Only the text of that day's list is kept, and recordings are capped at two minutes." },
-  { q: "Does it connect to my calendar?", a: "Not yet, and on purpose. Tell it about fixed things in the same sentence, like \"meeting at 2\", and the day is planned around them." },
+  { q: "Does it connect to my calendar?", a: "Not yet, and on purpose. Tell it about fixed things in the same sentence, like \"plumber at 2\", and the day is planned around them." },
   { q: "What if it guesses a duration wrong?", a: "Every estimate is marked until you set it. Tap it, change the time, and only the unfinished part of the day is re-planned." },
   { q: "What happens to things I don't get to?", a: "Move them to tomorrow, a weekday or a date you pick. They show up as carried over when you start that day." },
   { q: "Which phones does it work on?", a: "Any modern phone browser. Add it to your home screen and it opens like an app, and today's plan is available offline." },
@@ -131,7 +131,7 @@ export function Landing() {
         <section className="band" aria-labelledby="film-h">
           <div className="wrap">
             <p className="kicker">Watch</p>
-            <h2 id="film-h">The whole idea in 30 seconds.</h2>
+            <h2 id="film-h">The whole idea in under a minute.</h2>
             <div className="film">
               <video controls playsInline preload="none" poster="/videos/untangle-teaser-poster.jpg" aria-label="Untangle product film">
                 <source src="/videos/untangle-teaser-16x9.mp4" type="video/mp4" />

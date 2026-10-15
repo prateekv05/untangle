@@ -21,7 +21,7 @@ export function HeroPhone() {
   }, [reduced]);
 
   return (
-    <div className="phone" role="img" aria-label="Untangle's plan screen. Finish SQL at 09:00 in your freshest hours, then three errands bundled into one outing at 12:30, then Laundry at 15:00 and Call Mom at 17:30.">
+    <div className="phone" role="img" aria-label="Untangle's plan screen. Send the numbers at 09:00 in your freshest hours, then three errands bundled into one outing at 12:30, then Laundry at 15:00 and Call Mom at 17:30.">
       <div ref={ref} className={`screen${play ? " play" : ""}`} aria-hidden="true">
         <div className="p-top"><Mark size={22} />Untangle<Icon name="settings" className="set" /></div>
         <div className="p-head"><div className="p-date">Monday, October 5</div><div className="p-meta">Workday. Planned at 08:30.</div></div>
@@ -29,13 +29,13 @@ export function HeroPhone() {
           <span className="spine" />
           <div className="row" data-i style={{ "--i": 0 } as React.CSSProperties}>
             <div className="time">09:00</div><div className="rail"><span className="node work" /></div>
-            <div className="tcard"><div className="t1"><span>Finish SQL assignment</span><i className="chk" /></div>
+            <div className="tcard"><div className="t1"><span>Send Dana the numbers</span><i className="chk" /></div>
               <div className="m"><WhereTag where="work" />about 1 h 30 min</div>
               <div className="reason">Your freshest hours, so the hardest thing goes first.</div></div>
           </div>
           <div className="row" data-i style={{ "--i": 1 } as React.CSSProperties}>
             <div className="time">10:45</div><div className="rail"><span className="node anywhere" /></div>
-            <div className="tcard"><div className="t1"><span>Send resume to Sarah</span><i className="chk" /></div>
+            <div className="tcard"><div className="t1"><span>Pay the electric bill</span><i className="chk" /></div>
               <div className="m"><WhereTag where="anywhere" />15 min</div></div>
           </div>
           <div className="outing" style={{ "--i": 2, "--last": 5 } as React.CSSProperties}>

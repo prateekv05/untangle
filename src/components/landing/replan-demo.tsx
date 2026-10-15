@@ -11,7 +11,7 @@ import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 const ROW = 52;
 
-type RowId = "done" | "now" | "sql" | "resume" | "meet" | "out" | "wash" | "mom";
+type RowId = "done" | "now" | "numbers" | "bill" | "plumber" | "out" | "wash" | "mom";
 type Kind = "done" | "now";
 type Opts = { name?: string; sub?: string; was?: string; pill?: string; later?: string };
 type Entry = [RowId, string, Opts?];
@@ -19,9 +19,9 @@ type Entry = [RowId, string, Opts?];
 const ROWS: Record<RowId, { name: string; loc: Where; sub?: string; kind?: Kind }> = {
   done: { name: "", loc: "outside", kind: "done" },
   now: { name: "", loc: "anywhere", kind: "now" },
-  sql: { name: "Finish SQL", loc: "work" },
-  resume: { name: "Send resume to Sarah", loc: "anywhere" },
-  meet: { name: "Meeting", loc: "work" },
+  numbers: { name: "Send the numbers", loc: "work" },
+  bill: { name: "Pay electric bill", loc: "anywhere" },
+  plumber: { name: "Plumber visit", loc: "home" },
   out: { name: "One outing", sub: "3 stops", loc: "outside" },
   wash: { name: "Laundry", loc: "home" },
   mom: { name: "Call Mom", loc: "anywhere" },
@@ -30,22 +30,22 @@ const IDS = Object.keys(ROWS) as RowId[];
 
 const BASE: { note: string; rows: Entry[] } = {
   note: "Planned at 08:30",
-  rows: [["sql", "09:00"], ["resume", "10:45"], ["out", "12:30"], ["wash", "15:00"], ["mom", "17:30"]],
+  rows: [["numbers", "09:00"], ["bill", "10:45"], ["out", "12:30"], ["wash", "15:00"], ["mom", "17:30"]],
 };
 
 type Scenario = { label: string; said: string; note: string; rows: Entry[]; changes: string[] };
 const SCENARIOS: Record<string, Scenario> = {
-  meeting: {
-    label: "I didn't finish SQL. Meeting at 2.", said: "I didn't finish SQL. Meeting at 2.", note: "Re-planned at 12:20",
-    rows: [["done", "", { name: "1 finished" }], ["now", "", { name: "Now, 12:20" }], ["sql", "12:30", { was: "09:00", sub: "45 min left" }],
-      ["meet", "14:00", { pill: "Fixed" }], ["out", "15:15", { was: "12:30" }], ["wash", "16:45", { was: "15:00" }], ["mom", "17:30"]],
-    changes: ["Kept Finish SQL with the 45 min you have left.", "Planned around your meeting at 14:00.", "Moved the outing to 15:15, after the meeting."],
+  plumber: {
+    label: "I didn't send the numbers. Plumber at 2.", said: "I didn't send the numbers. Plumber at 2.", note: "Re-planned at 12:20",
+    rows: [["done", "", { name: "1 finished" }], ["now", "", { name: "Now, 12:20" }], ["numbers", "12:30", { was: "09:00", sub: "45 min left" }],
+      ["plumber", "14:00", { pill: "Fixed" }], ["out", "15:15", { was: "12:30" }], ["wash", "16:45", { was: "15:00" }], ["mom", "17:30"]],
+    changes: ["Kept the numbers with the 45 min you have left.", "Planned around the plumber at 14:00.", "Moved the outing to 15:15, after the plumber leaves."],
   },
   late: {
     label: "I'm running 90 minutes late.", said: "I'm running 90 minutes late.", note: "Re-planned at 09:00",
-    rows: [["now", "", { name: "Now, 09:00" }], ["sql", "10:30", { was: "09:00" }], ["resume", "12:15", { was: "10:45" }],
+    rows: [["now", "", { name: "Now, 09:00" }], ["numbers", "10:30", { was: "09:00" }], ["bill", "12:15", { was: "10:45" }],
       ["out", "13:00", { was: "12:30" }], ["wash", "15:30", { was: "15:00" }], ["mom", "17:30"]],
-    changes: ["Started your day at 10:30, still with SQL first.", "Shortened lunch so the outing still fits.", "Call Mom stays at 17:30."],
+    changes: ["Started your day at 10:30, still with the numbers first.", "Shortened lunch so the outing still fits.", "Call Mom stays at 17:30."],
   },
   lighter: {
     label: "Give me a lighter afternoon.", said: "Give me a lighter afternoon.", note: "Re-planned at 12:20",

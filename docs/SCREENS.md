@@ -29,7 +29,7 @@ Purpose: get everything out of the user's head. Nothing else competes.
 - Carry-over card (only if tasks were moved to today): "Carried over: Gym, Buy toothpaste." with "Add" per item. Sits above the dump box.
 - Examples (dev/demo only, behind `?demo=1`): "Try an example", "With an appointment".
 
-States: empty (placeholder: "SQL assignment, gym, groceries, call Mom, send resume to Sarah, work on my app, buy toothpaste…"), typing, mic permission, error (text stays).
+States: empty (placeholder: "Send the numbers, gym, groceries, call Mom, pay the electric bill, work on my app, buy toothpaste…"), typing, mic permission, error (text stays).
 
 ## 2. Listening (`02-listening.html`)
 
@@ -92,7 +92,7 @@ Motion (one orchestrated moment): the spine draws down, blocks arrive along it w
 Same screen as Plan, with:
 - Heading "Re-planned at 11:45", sub: `You said: "…"` (user's words, sans).
 - Decisions card headline "Here is what I changed", 3 to 5 lines.
-- A done row: "1 finished: Send resume to Sarah" (collapsed; tap to expand the list).
+- A done row: "1 finished: Pay electric bill" (collapsed; tap to expand the list).
 - "Now, 11:45" marker on the thread (ink, not a location colour).
 - "was 09:00" pills on moved tasks; "Fixed at 14:00" on new events.
 - Undo: toast "Re-planned. Undo" for 8 s restores the previous plan version.

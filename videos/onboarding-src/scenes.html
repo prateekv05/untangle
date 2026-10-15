@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Untangle onboarding scenes</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+@font-face{font-family:"SG Heavy";src:url(fonts/SchibstedHeavy.woff2);font-weight:100 900}
+@font-face{font-family:"SG Semi";src:url(fonts/Schibsted.woff2)}
+@font-face{font-family:"SG Body";src:url(fonts/SchibstedBody.woff2);font-weight:100 900}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:342px;height:270px;overflow:hidden;background:var(--ground)}
+#card{position:absolute;inset:0;background:var(--surface);border:1px solid var(--line);border-radius:24px;overflow:hidden;font-family:"SG Body",sans-serif;color:var(--ink)}
+[data-loc=out]{--c:var(--thread-outside);--il:var(--outside-ink);--tint:var(--outside-tint)}
+[data-loc=work]{--c:var(--thread-work);--il:var(--work-ink);--tint:var(--work-tint)}
+[data-loc=home]{--c:var(--thread-home);--il:var(--home-ink);--tint:var(--home-tint)}
+[data-loc=any]{--c:var(--thread-anywhere);--il:var(--anywhere-ink);--tint:var(--anywhere-tint)}
+.abs{position:absolute}
+.tag{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 11px 0 9px;border-radius:99px;background:var(--tint);color:var(--il);font:700 13px "SG Semi";white-space:nowrap}
+.tag:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--c)}
+.dot{position:absolute;border-radius:50%;background:var(--c)}
+/* dump */
+#dtext{left:20px;top:22px;width:302px;font:500 18px/28px "SG Body"}
+#dtext .hl{background:var(--tint);border-radius:7px;padding:2px 2px;-webkit-box-decoration-break:clone;box-decoration-break:clone;transition:none}
+#caret{display:inline-block;width:2px;height:20px;background:var(--ink);vertical-align:-4px;margin-left:1px}
+#chips{left:20px;top:124px;width:302px;display:flex;flex-wrap:wrap;gap:8px 8px}
+#chips .tag{opacity:0}
+#count{left:20px;top:228px;font:600 14px "SG Semi";color:var(--ink-muted)}
+#wave{left:110px;width:150px;top:218px;height:40px;display:flex;align-items:center;justify-content:space-between}
+#wave i{display:block;width:3.4px;border-radius:2px;background:var(--ink-muted)}
+#micb{left:278px;top:216px;width:44px;height:44px;border-radius:50%;background:var(--ink);display:grid;place-items:center}
+#micb svg{width:20px;height:20px;stroke:var(--ink-inverse);fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+#stopsq{position:absolute;width:14px;height:14px;border-radius:4px;background:var(--ink-inverse)}
+/* understand */
+.urow{left:0;width:342px;height:34px;z-index:2}
+.urow .dot{left:28px;top:10px;width:13px;height:13px}
+.urow .nm{position:absolute;left:52px;top:0;line-height:34px;font:600 18px/34px "SG Semi";color:var(--ink);white-space:nowrap}
+.urow .pl{position:absolute;right:24px;top:5px}
+.urow .pl.flat{background:transparent}
+#obox{left:13px;width:316px;border:1.5px dashed var(--thread-outside);border-radius:24px;background:var(--outside-tint);opacity:0}
+#otitle{left:25px;font:800 22px/26px "SG Heavy";color:var(--outside-ink);opacity:0;white-space:nowrap}
+#ostops{right:25px;font:500 14px "SG Semi";color:var(--outside-ink);opacity:0}
+.uline{left:33px;width:2px;background:var(--line);border-radius:1px}
+.taut{z-index:1;left:31.5px;width:5px;background:var(--thread-outside);border-radius:1px}
+/* replan */
+#said{left:20px;top:20px;width:302px;height:46px;border-radius:23px;background:var(--surface-soft)}
+#stxt{position:absolute;left:16px;top:0;line-height:46px;font:400 16px/46px "SG Body";color:var(--ink);white-space:nowrap}
+#smic{position:absolute;right:14px;top:12px;width:22px;height:22px;stroke:var(--ink-muted);fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+#sdot{position:absolute;right:20px;top:19px;width:8px;height:8px;border-radius:50%;background:var(--ink);opacity:0}
+.rrow{left:0;width:342px;height:30px}
+.rrow .tm{position:absolute;left:20px;top:0;line-height:30px;font:600 16px/30px "SG Semi";color:var(--ink-muted)}
+.rrow .dot{left:66px;top:9px;width:12px;height:12px}
+.rrow .nm{position:absolute;left:90px;top:0;font:600 16px/30px "SG Semi";white-space:nowrap}
+.rrow .was{position:absolute;right:20px;top:3px;height:24px;padding:0 9px;border-radius:99px;background:var(--surface-soft);color:var(--ink-muted);font:600 12.5px/24px "SG Semi";opacity:0;white-space:nowrap}
+#rspine{left:71px;width:2px;background:var(--line);border-radius:1px}
+#nowp{left:90px;height:26px;padding:0 14px;border-radius:99px;background:var(--ink);color:var(--ink-inverse);font:800 16px/26px "SG Heavy";opacity:0;white-space:nowrap}
+#nowd{left:66px;width:12px;height:12px;border-radius:50%;background:var(--ink);opacity:0}
+</style></head>
+<body>
+<div id="card"></div>
+<script>
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),prog=(t,a,b)=>clamp((t-a)/(b-a)),eo=x=>1-Math.pow(1-x,3),eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2,lerp=(a,b,t)=>a+(b-a)*t;
+const q=new URLSearchParams(location.search),SCENE=q.get('scene')||'dump';
+document.documentElement.dataset.theme=q.get('theme')||'light';
+const card=document.getElementById('card');
+const el=(cls,html='',id)=>{const e=document.createElement('div');e.className=cls;if(id)e.id=id;e.innerHTML=html;card.appendChild(e);return e};
+const hash=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const MIC='<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const SCENES={};
+
+/* ---------------- dump (6.0 s, loop) ---------------- */
+SCENES.dump=()=>{
+  const DUR=6.0,TEXT='send Dana the numbers, groceries, call Mom, pick up my prescription, return that package';
+  const TASKS=[['Dana the numbers','Send the numbers','work'],['groceries','Groceries','out'],['call Mom','Call Mom','any'],['prescription','Prescription','out'],['that package','Return package','out']].map(([p,name,loc])=>{const a=TEXT.indexOf(p);return{a,b:a+p.length,name,loc}});
+  const T0=.45,T1=3.9,charT=i=>T0+i/TEXT.length*(T1-T0);
+  const txt=el('abs','','dtext'),chips=el('abs','','chips'),count=el('abs','','count'),wave=el('abs','','wave'),mic=el('abs','','micb');
+  const bars=[...Array(22)].map(()=>{const i=document.createElement('i');wave.appendChild(i);return i});
+  const chipEls=TASKS.map(t=>{const c=document.createElement('span');c.className='tag';c.dataset.loc=t.loc;c.textContent=t.name;chips.appendChild(c);return c});
+  function seek(t){
+    const n=t<T0?0:Math.min(TEXT.length,Math.floor((t-T0)/(T1-T0)*TEXT.length));
+    const fade=1-prog(t,5.35,5.85),empty=t>=5.4;
+    // text with highlights for fully-typed tasks
+    let html='',pos=0;
+    TASKS.forEach(k=>{if(k.b<=n){html+=esc(TEXT.slice(pos,k.a))+`<span class="hl" data-loc="${k.loc}">${esc(TEXT.slice(k.a,k.b))}</span>`;pos=k.b}});
+    html+=esc(TEXT.slice(pos,n));
+    const typing=t>=T0&&t<T1+.15;
+    txt.innerHTML=html+(typing||t<T0?`<span id="caret" style="opacity:${(Math.floor(t*2.2)%2)||typing?1:0}"></span>`:'');
+    txt.style.opacity=fade;
+    let done=0;
+    chipEls.forEach((c,i)=>{const at=charT(TASKS[i].b)+.12,p=eo(prog(t,at,at+.35));if(p>0)done=i+1;c.style.opacity=p*fade;c.style.transform=`translateY(${(1-p)*6}px) scale(${.92+.08*p})`});
+    chips.style.opacity=1;
+    const listening=t<4.55;
+    count.textContent=empty?'Nothing yet':listening&&done===0?'Listening':done+(done===1?' task':' tasks');
+    count.style.opacity=empty?prog(t,5.5,5.9)*0+1:1;
+    // waveform: live while listening, dotted otherwise
+    const on=t>=.3&&listening?Math.min(1,prog(t,.3,.7)):0;
+    bars.forEach((b,i)=>{const a=Math.abs(Math.sin(t*7+i*.7)*Math.sin(t*3.1+i*1.9));b.style.height=(3.4+on*30*a)+'px';b.style.opacity=on>0?1:.55;b.style.borderRadius=on>0?'2px':'50%'});
+    mic.innerHTML=listening?'<i id="stopsq"></i>':MIC;
+    mic.style.transform=`scale(${1-.06*Math.sin(prog(t,4.5,4.7)*Math.PI)})`;
+  }
+  return{DUR,seek,poster:5.0};
+};
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+
+/* ---------------- understand (6.5 s, loop) ---------------- */
+SCENES.understand=()=>{
+  const DUR=6.5;
+  const R=[{n:'Send the numbers',loc:'work',pill:'Work',flat:[38],fin:38},{n:'Groceries',loc:'out',pill:'Outside',flat:[80],fin:160},{n:'Call Mom',loc:'any',pill:'Anywhere',flat:[122],fin:76},{n:'Prescription',loc:'out',pill:'Outside',flat:[164],fin:194},{n:'Return package',loc:'out',pill:'Outside',flat:[206],fin:228}];
+  const slack=[el('abs uline'),el('abs uline'),el('abs uline'),el('abs uline')];
+  const tauts=[el('abs taut'),el('abs taut')];
+  const box=el('abs','','obox'),title=el('abs','One outing','otitle'),stops=el('abs','3 stops','ostops');
+  const rows=R.map(r=>{const e=el('abs urow');e.dataset.loc=r.loc;e.innerHTML=`<i class="dot"></i><span class="nm">${r.n}</span><span class="pl tag">${r.pill}</span>`;return e});
+  const dots=rows.map(e=>e.querySelector('.dot'));
+  function seek(t){
+    const out=1-prog(t,6.0,6.5);
+    const g=eio(prog(t,2.0,3.1));
+    const ys=R.map((r,i)=>lerp(r.flat[0],r.fin,g));
+    R.forEach((r,i)=>{const at=.1+i*.36,p=eo(prog(t,at,at+.4));const e=rows[i];
+      e.style.top=(ys[i]-17)+'px';e.style.opacity=p*out;e.style.transform=`translateY(${(1-p)*10}px)`;
+      const pl=e.querySelector('.pl');
+      if(r.loc==='out'){const k=eio(prog(t,2.3,3.0));pl.style.background=`color-mix(in srgb, var(--tint) ${(1-k)*100}%, transparent)`;pl.style.paddingRight='';}
+    });
+    // outing box
+    const bp=eo(prog(t,2.2,3.0)),bt=136-33,bh=154;
+    box.style.top=lerp(bt+30,bt,bp)+'px';box.style.height=bh+'px';box.style.opacity=bp*out;
+    title.style.top=(bt+10)+'px';title.style.opacity=eo(prog(t,2.55,3.1))*out;stops.style.top=(bt+13)+'px';stops.style.opacity=eo(prog(t,2.55,3.1))*out;
+    const sl=1-prog(t,2.2,3.0);
+    // before regroup: numbers - groceries - Mom - prescription - package chain; after: numbers - Mom only
+    const chain=[[0,1],[1,2],[2,3],[3,4]];
+    chain.forEach(([a,b],i)=>{const s=slack[i],ya=ys[a]+11,yb=ys[b]-11,o=Math.min(+rows[a].style.opacity,+rows[b].style.opacity);
+      let keep=1;
+      if(i===0)keep=1-g;      // numbers-groceries goes away as Mom takes the second slot
+      if(i===1)keep=1-g;      // groceries-Mom
+      if(i===2)keep=1-g;      // Mom-prescription
+      if(i===3)keep=sl;       // prescription-package becomes taut
+      s.style.top=Math.min(ya,yb)+'px';s.style.height=Math.max(0,Math.abs(yb-ya))+'px';s.style.opacity=o*keep});
+    // numbers -> Mom thread appears after regroup
+    // reuse slack[0] as numbers->Mom after g>0.6: draw separately via tauts? keep simple with extra element
+    nm.style.top=(ys[0]+11)+'px';nm.style.height=Math.max(0,ys[2]-ys[0]-22)+'px';nm.style.opacity=prog(g,.6,1)*+rows[2].style.opacity;
+    // taut thread through the outing: green bars between the three outing dots
+    const tk=eio(prog(t,2.7,3.4));
+    [[1,3],[3,4]].forEach(([a,b],i)=>{const s=tauts[i],ya=ys[a]+8,yb=ys[b]-8;s.style.top=ya+'px';s.style.height=Math.max(0,yb-ya)+'px';s.style.opacity=tk*out;s.style.transform=`scaleX(${lerp(.4,1,tk)})`});
+    // groceries->prescription taut drawn between groceries and prescription, prescription->package between those
+    tauts[0].style.top=(ys[1]+8)+'px';tauts[0].style.height=Math.max(0,ys[3]-ys[1]-16)+'px';
+    tauts[1].style.top=(ys[3]+8)+'px';tauts[1].style.height=Math.max(0,ys[4]-ys[3]-16)+'px';
+  }
+  const nm=el('abs uline');
+  return{DUR,seek,poster:5.0};
+};
+
+/* ---------------- replan (7.0 s, loop) ---------------- */
+SCENES.replan=()=>{
+  const DUR=7.0,SAID="Numbers not sent. Plumber at 2.";
+  const P=[ // id, name, loc, base time, base y, new time, new y, was
+    ['numbers','Send the numbers','work','09:00',112,'12:30',135,'was 09:00'],
+    ['plumber','Plumber visit','home',null,0,'14:00',171,null],
+    ['out','One outing','out','12:30',150,'15:15',207,'was 12:30'],
+    ['wash','Laundry','home','15:00',188,'16:45',243,'was 15:00']];
+  const spine=el('abs','','rspine'),said=el('abs','','said');
+  said.innerHTML='<span id="stxt"></span>'+MIC.replace('<svg','<svg id="smic"')+'<i id="sdot"></i>';
+  const stxt=said.querySelector('#stxt'),smic=said.querySelector('#smic'),sdot=said.querySelector('#sdot');
+  const nowd=el('abs','','nowd'),nowp=el('abs','Now, 12:20','nowp');
+  const rows=P.map(r=>{const e=el('abs rrow');e.dataset.loc=r[2];e.innerHTML=`<span class="tm"></span><i class="dot"></i><span class="nm">${r[1]}</span>${r[7]?`<span class="was">${r[7]}</span>`:''}`;return e});
+  const wasEls=P.map((r,i)=>r[7]?rows[i].querySelector('.was'):null);
+  const S0=.4,S1=2.5,RB=3.2,RB1=4.3;
+  function seek(t){
+    const out=(1-prog(t,6.45,7.0))*eo(prog(t,0,.4));
+    const n=t<S0?0:Math.min(SAID.length,Math.floor((t-S0)/(S1-S0)*SAID.length+.0001));
+    stxt.textContent=n?SAID.slice(0,n):'What changed?';stxt.style.color=n?'var(--ink)':'var(--ink-muted)';stxt.style.opacity=out;
+    const typing=t>=S0&&t<S1+.45;sdot.style.opacity=typing?1:0;smic.style.opacity=typing?0:1;
+    const g=eio(prog(t,RB,RB1));
+    P.forEach((r,i)=>{const e=rows[i],tm=e.querySelector('.tm');
+      let y,op;
+      if(r[0]==='plumber'){y=r[6];op=eo(prog(t,RB+.5,RB+1.0))}
+      else{y=lerp(r[4],r[6],g);op=1}
+      const base=r[0]==='plumber'?null:r[3];
+      // time label: old time fades into the new one halfway through the move
+      const sw=prog(g,.25,.75);
+      tm.textContent=base&&sw<.5?base:r[5];tm.style.opacity=Math.abs(sw-.5)*2<1&&base?Math.max(.0,Math.abs(sw-.5)*2):1;
+      e.style.top=(y-15)+'px';e.style.opacity=op*out;
+      const w=wasEls[i];if(w){const k=eo(prog(t,RB+.9+i*.12,RB+1.4+i*.12));w.style.opacity=k;w.style.transform=`translateX(${(1-k)*8}px)`}
+    });
+    const nk=eo(prog(t,RB+.1,RB+.6));
+    nowd.style.top=(98-6)+'px';nowd.style.opacity=nk*out;nowp.style.top=(98-13)+'px';nowp.style.opacity=nk*out;nowp.style.transform=`translateX(${(1-nk)*-6}px)`;
+    const first=lerp(112,98,g),last=lerp(188,243,g);
+    spine.style.top=first+'px';spine.style.height=(last-first)+'px';spine.style.opacity=out;
+    said.style.opacity=1;
+  }
+  return{DUR,seek,poster:6.2};
+};
+
+const S=SCENES[SCENE]();window.DUR=S.DUR;window.POSTER=S.poster;window.seek=t=>S.seek(t);S.seek(0);
+</script></body></html>

@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { browserTimezone } from "@/lib/clock";
 import type { Settings } from "@/lib/schemas";
 import { themePreference, setThemePreference, type ThemePref } from "@/lib/theme";
-import { AccountSection } from "../account-section";
+import { AccountActions, AccountSection } from "../account-section";
 import { Button } from "../button";
 import { SegmentedControl } from "../segmented-control";
 import { Sheet } from "../sheet";
@@ -35,7 +35,7 @@ export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSa
   const toggleDay = (d: number) => setS({ ...s, workDays: s.workDays.includes(d) ? s.workDays.filter((x) => x !== d) : [...s.workDays, d].sort() });
   return (
     <Sheet title="Settings" onClose={onClose} tall>
-      <AccountSection onPassword={onPassword} onDelete={onDeleteAccount} />
+      <AccountSection onPassword={onPassword} />
       {loadFailed ? (
         <div className="mt-2">
           <p role="alert" className="voice m-0 text-ask-ink">I couldn&apos;t load your settings. Check your connection, then try again.</p>
@@ -70,6 +70,7 @@ export function SettingsSheet({ loadFailed, onRetry, settings, presetCount, onSa
         <div className="mt-5"><Button type="submit">Save</Button></div>
       </form>
       )}
+      <AccountActions onDelete={onDeleteAccount} />
     </Sheet>
   );
 }
